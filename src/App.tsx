@@ -110,10 +110,12 @@ function App() {
       )
       const dividendsData = await dividendsResponse.json()
 
-      // Calculăm următoarea dată de dividend și frecvența
-      const sortedDividends = dividendsData.sort((a: any, b: any) => b.date - a.date)
+      // Verificăm dacă avem un array valid de dividende
+      const sortedDividends = Array.isArray(dividendsData) && dividendsData.length > 0
+        ? dividendsData.sort((a: any, b: any) => b.date - a.date)
+        : []
       const nextDividend = sortedDividends[0]
-      const dividendFrequency = getDividendFrequency(sortedDividends)
+      const dividendFrequency = Array.isArray(dividendsData) ? getDividendFrequency(dividendsData) : 'Unknown'
 
       const stockData: StockData = {
         labels: candlesData.t.map(formatDate),
