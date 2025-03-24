@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -11,6 +11,7 @@ import {
   Legend,
   ChartData
 } from 'chart.js'
+import { supabase } from './supabase'
 
 ChartJS.register(
   CategoryScale,
@@ -32,6 +33,7 @@ interface StockData {
 }
 
 interface PortfolioItem {
+  id?: number
   symbol: string
   shares: number
   price: number
@@ -61,6 +63,60 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([])
   const [shares, setShares] = useState<number>(1)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Verificăm dacă utilizatorul este autentificat
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setUserId(user.id)
+        // Încărcăm portofoliul utilizatorului
+        loadPortfolio(user.id)
+      } else {
+        // Dacă nu este autentificat, creăm un cont anonim
+        const { data: { user: anonUser }, error } = await supabase.auth.signUp({
+          email: `${Math.random().toString(36).substring(2)}@anonymous.com`,
+          password: Math.random().toString(36).substring(2)
+        })
+        if (error) {
+          console.error('Eroare la crearea contului anonim:', error)
+          return
+        }
+        if (anonUser) {
+          setUserId(anonUser.id)
+        }
+      }
+    }
+
+    checkUser()
+  }, [])
+
+  const loadPortfolio = async (uid: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('portfolio')
+        .select('*')
+        .eq('user_id', uid)
+
+      if (error) throw error
+
+      if (data) {
+        const portfolioItems: PortfolioItem[] = data.map(item => ({
+          id: item.id,
+          symbol: item.symbol,
+          shares: item.shares,
+          price: item.price,
+          dividendPerShare: item.dividend_per_share,
+          nextDividendDate: item.next_dividend_date,
+          dividendFrequency: item.dividend_frequency
+        }))
+        setPortfolio(portfolioItems)
+      }
+    } catch (error) {
+      console.error('Eroare la încărcarea portofoliului:', error)
+    }
+  }
 
   const searchStock = async () => {
     if (!symbol) return
@@ -147,8 +203,8 @@ function App() {
     }
   }
 
-  const addToPortfolio = () => {
-    if (!stockData) return
+  const addToPortfolio = async () => {
+    if (!stockData || !userId) return
 
     const newItem: PortfolioItem = {
       symbol: symbol.toUpperCase(),
@@ -159,18 +215,62 @@ function App() {
       dividendFrequency: stockData.dividendFrequency
     }
 
-    setPortfolio(prev => [...prev, newItem])
-    setShares(1)
+    try {
+      const { data, error } = await supabase
+        .from('portfolio')
+        .insert([{
+          user_id: userId,
+          symbol: newItem.symbol,
+          shares: newItem.shares,
+          price: newItem.price,
+          dividend_per_share: newItem.dividendPerShare,
+          next_dividend_date: newItem.nextDividendDate,
+          dividend_frequency: newItem.dividendFrequency
+        }])
+        .select()
+
+      if (error) throw error
+
+      if (data && data[0]) {
+        const insertedItem: PortfolioItem = {
+          id: data[0].id,
+          ...newItem
+        }
+        setPortfolio(prev => [...prev, insertedItem])
+        setShares(1)
+      }
+    } catch (error) {
+      console.error('Eroare la adăugarea în portofoliu:', error)
+      setError('Eroare la salvarea în portofoliu')
+    }
   }
 
-  const updateShares = (symbol: string, newShares: number) => {
-    setPortfolio(prev =>
-      prev.map(item =>
-        item.symbol === symbol
-          ? { ...item, shares: newShares }
-          : item
+  const updateShares = async (symbol: string, newShares: number) => {
+    try {
+      const itemToUpdate = portfolio.find(item => item.symbol === symbol)
+      if (!itemToUpdate || !itemToUpdate.id || !userId) return
+
+      const { error } = await supabase
+        .from('portfolio')
+        .update({
+          shares: newShares
+        })
+        .eq('id', itemToUpdate.id)
+        .eq('user_id', userId)
+
+      if (error) throw error
+
+      setPortfolio(prev =>
+        prev.map(item =>
+          item.symbol === symbol
+            ? { ...item, shares: newShares }
+            : item
+        )
       )
-    )
+    } catch (error) {
+      console.error('Eroare la actualizarea acțiunilor:', error)
+      setError('Eroare la actualizarea numărului de acțiuni')
+    }
   }
 
   const chartData: ChartData<'line'> | null = stockData ? {
