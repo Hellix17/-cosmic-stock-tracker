@@ -225,38 +225,65 @@ function App() {
   } : null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-violet-950 text-white p-8">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-4xl font-bold text-center mb-8">Cosmic Stock Tracker</h1>
-        
-        <div className="flex gap-4 mb-8">
-          <input
-            type="text"
-            value={symbol}
-            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-            placeholder="Introduceți simbolul (ex: AAPL)"
-            className="flex-1 p-2 rounded bg-violet-900/50 border border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400"
-            onKeyDown={(e) => e.key === 'Enter' && searchStock()}
-          />
-          <button
-            onClick={searchStock}
-            disabled={loading}
-            className="px-6 py-2 bg-violet-600 rounded hover:bg-violet-500 transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Se încarcă...' : 'Caută'}
-          </button>
+    <div className="min-h-screen bg-[#0A0B1E] bg-[url('/stars.png')] text-white">
+      <div className="max-w-7xl mx-auto px-4">
+        {/* Header */}
+        <header className="py-6 border-b border-violet-800/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🌙</span>
+              <h1 className="text-2xl font-medium bg-gradient-to-r from-violet-400 to-purple-600 bg-clip-text text-transparent">
+                Stock Tracker
+              </h1>
+            </div>
+          </div>
+        </header>
+
+        {/* Hero Section */}
+        <div className="py-20 text-center space-y-6">
+          <h2 className="text-5xl font-bold bg-gradient-to-r from-violet-400 to-purple-600 bg-clip-text text-transparent">
+            Bun venit în Spațiul Investițiilor!
+          </h2>
+          <p className="text-violet-300 text-lg">
+            Urmărește evoluția acțiunilor într-un mod interactiv și elegant.
+          </p>
+
+          {/* Search Bar */}
+          <div className="max-w-2xl mx-auto mt-12">
+            <div className="relative flex items-center">
+              <input
+                type="text"
+                value={symbol}
+                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                placeholder="Introduceți simbolul (ex: AAPL)"
+                className="w-full px-6 py-4 bg-white/5 border border-violet-500/30 rounded-lg focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 text-lg"
+                onKeyDown={(e) => e.key === 'Enter' && searchStock()}
+              />
+              <button
+                onClick={searchStock}
+                disabled={loading}
+                className="absolute right-2 px-6 py-2 bg-violet-600 hover:bg-violet-500 rounded-md transition-colors disabled:opacity-50 text-white font-medium"
+              >
+                {loading ? 'Se încarcă...' : 'Caută'}
+              </button>
+            </div>
+          </div>
         </div>
 
         {error && (
-          <div className="mb-8 p-4 bg-red-500/20 border border-red-500 rounded text-red-200">
+          <div className="max-w-2xl mx-auto mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-200">
             {error}
           </div>
         )}
 
         {stockData && (
-          <div className="space-y-8">
-            <div className="bg-violet-900/20 p-6 rounded-lg border border-violet-500/30">
-              <h2 className="text-2xl font-semibold mb-4">{stockData.companyName} ({symbol.toUpperCase()})</h2>
+          <div className="space-y-8 mb-20">
+            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-violet-500/30">
+              <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
+                <span className="text-violet-400">{symbol.toUpperCase()}</span>
+                <span className="text-gray-400">•</span>
+                <span>{stockData.companyName}</span>
+              </h2>
               <div className="h-[400px]">
                 {chartData && <Line data={chartData} options={{
                   responsive: true,
@@ -272,14 +299,17 @@ function App() {
                     }
                   },
                   plugins: {
-                    legend: { labels: { color: 'rgba(255, 255, 255, 0.9)' } }
+                    legend: { 
+                      labels: { color: 'rgba(255, 255, 255, 0.9)' },
+                      display: false
+                    }
                   }
                 }} />}
               </div>
             </div>
 
-            <div className="bg-violet-900/20 p-6 rounded-lg border border-violet-500/30">
-              <h3 className="text-xl font-semibold mb-4">Adaugă la portofoliu</h3>
+            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-violet-500/30">
+              <h3 className="text-xl font-semibold mb-6 text-violet-400">Adaugă la portofoliu</h3>
               <div className="flex gap-4 items-center">
                 <input
                   type="number"
@@ -287,11 +317,11 @@ function App() {
                   onChange={(e) => setShares(Math.max(0.01, Number(e.target.value)))}
                   step="0.01"
                   min="0.01"
-                  className="w-32 p-2 rounded bg-violet-900/50 border border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  className="w-32 px-4 py-2 bg-white/5 border border-violet-500/30 rounded-lg focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
                 />
                 <button
                   onClick={addToPortfolio}
-                  className="px-6 py-2 bg-violet-600 rounded hover:bg-violet-500 transition-colors"
+                  className="px-6 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors text-white font-medium"
                 >
                   Adaugă la portofoliu
                 </button>
@@ -299,57 +329,57 @@ function App() {
             </div>
 
             {portfolio.length > 0 && (
-              <div className="bg-violet-900/20 p-6 rounded-lg border border-violet-500/30">
-                <h3 className="text-xl font-semibold mb-4">Portofoliul meu</h3>
+              <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-violet-500/30">
+                <h3 className="text-xl font-semibold mb-6 text-violet-400">Portofoliul meu</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="text-violet-300">
-                        <th className="text-left p-2">Simbol</th>
-                        <th className="text-left p-2">Acțiuni</th>
-                        <th className="text-right p-2">Preț/acțiune</th>
-                        <th className="text-right p-2">Valoare totală</th>
-                        <th className="text-right p-2">Dividend/acțiune</th>
-                        <th className="text-right p-2">Dividend estimat</th>
-                        <th className="text-left p-2">Următorul dividend</th>
-                        <th className="text-left p-2">Frecvență</th>
+                      <tr className="text-violet-300 border-b border-violet-500/30">
+                        <th className="text-left p-3">Simbol</th>
+                        <th className="text-left p-3">Acțiuni</th>
+                        <th className="text-right p-3">Preț/acțiune</th>
+                        <th className="text-right p-3">Valoare totală</th>
+                        <th className="text-right p-3">Dividend/acțiune</th>
+                        <th className="text-right p-3">Dividend estimat</th>
+                        <th className="text-left p-3">Următorul dividend</th>
+                        <th className="text-left p-3">Frecvență</th>
                       </tr>
                     </thead>
                     <tbody>
                       {portfolio.map((item) => (
-                        <tr key={item.symbol} className="border-t border-violet-500/30">
-                          <td className="p-2">{item.symbol}</td>
-                          <td className="p-2">
+                        <tr key={item.symbol} className="border-b border-violet-500/10 hover:bg-white/5">
+                          <td className="p-3 font-medium text-violet-400">{item.symbol}</td>
+                          <td className="p-3">
                             <input
                               type="number"
                               value={item.shares}
                               onChange={(e) => updateShares(item.symbol, Math.max(0.01, Number(e.target.value)))}
                               step="0.01"
                               min="0.01"
-                              className="w-24 p-1 rounded bg-violet-900/50 border border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                              className="w-24 px-2 py-1 bg-white/5 border border-violet-500/30 rounded-md focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
                             />
                           </td>
-                          <td className="text-right p-2">${item.price.toFixed(2)}</td>
-                          <td className="text-right p-2">${(item.price * item.shares).toFixed(2)}</td>
-                          <td className="text-right p-2">${item.dividendPerShare.toFixed(3)}</td>
-                          <td className="text-right p-2">${(item.dividendPerShare * item.shares).toFixed(2)}</td>
-                          <td className="p-2">{item.nextDividendDate}</td>
-                          <td className="p-2">{item.dividendFrequency}</td>
+                          <td className="text-right p-3">${item.price.toFixed(2)}</td>
+                          <td className="text-right p-3 font-medium">${(item.price * item.shares).toFixed(2)}</td>
+                          <td className="text-right p-3">${item.dividendPerShare.toFixed(3)}</td>
+                          <td className="text-right p-3">${(item.dividendPerShare * item.shares).toFixed(2)}</td>
+                          <td className="p-3">{item.nextDividendDate}</td>
+                          <td className="p-3">{item.dividendFrequency}</td>
                         </tr>
                       ))}
-                      <tr className="border-t border-violet-500/30 font-semibold">
-                        <td className="p-2">Total</td>
-                        <td className="p-2"></td>
-                        <td className="p-2"></td>
-                        <td className="text-right p-2">
+                      <tr className="border-t border-violet-500/30 font-semibold bg-white/5">
+                        <td className="p-3">Total</td>
+                        <td className="p-3"></td>
+                        <td className="p-3"></td>
+                        <td className="text-right p-3 text-violet-400">
                           ${portfolio.reduce((sum, item) => sum + item.price * item.shares, 0).toFixed(2)}
                         </td>
-                        <td className="p-2"></td>
-                        <td className="text-right p-2">
+                        <td className="p-3"></td>
+                        <td className="text-right p-3 text-violet-400">
                           ${portfolio.reduce((sum, item) => sum + item.dividendPerShare * item.shares, 0).toFixed(2)}
                         </td>
-                        <td className="p-2"></td>
-                        <td className="p-2"></td>
+                        <td className="p-3"></td>
+                        <td className="p-3"></td>
                       </tr>
                     </tbody>
                   </table>
