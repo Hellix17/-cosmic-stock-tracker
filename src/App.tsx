@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -57,13 +57,43 @@ const formatDate = (dateStr: string) => {
 }
 
 function App() {
-  const [symbol, setSymbol] = useState('')
+  const [symbol, setSymbol] = useState(() => localStorage.getItem('lastSymbol') || '')
   const [stockData, setStockData] = useState<StockData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([])
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>(() => {
+    const savedPortfolio = localStorage.getItem('portfolio')
+    return savedPortfolio ? JSON.parse(savedPortfolio) : []
+  })
   const [shares, setShares] = useState<number>(1)
-  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1M')
+  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>(() => 
+    (localStorage.getItem('selectedPeriod') as TimePeriod) || '1M'
+  )
+
+  // Salvăm portofoliul în localStorage când se modifică
+  const updatePortfolio = (newPortfolio: PortfolioItem[]) => {
+    setPortfolio(newPortfolio)
+    localStorage.setItem('portfolio', JSON.stringify(newPortfolio))
+  }
+
+  // Salvăm simbolul în localStorage când se modifică
+  const updateSymbol = (newSymbol: string) => {
+    setSymbol(newSymbol)
+    localStorage.setItem('lastSymbol', newSymbol)
+  }
+
+  // Salvăm perioada selectată în localStorage când se modifică
+  const updatePeriod = (period: TimePeriod) => {
+    setSelectedPeriod(period)
+    localStorage.setItem('selectedPeriod', period)
+  }
+
+  // Efectuăm căutarea inițială la încărcarea paginii dacă avem un simbol salvat
+  useEffect(() => {
+    if (symbol) {
+      void searchStock(selectedPeriod)
+    }
+  }, []) // Rulăm doar la montarea componentei
 
   const getStartDate = (period: TimePeriod): string => {
     const now = new Date()
@@ -145,7 +175,7 @@ function App() {
 
       console.log('StockData final:', stockData)
       setStockData(stockData)
-      setSelectedPeriod(period)
+      updatePeriod(period)
     } catch (error) {
       console.error('Eroare completă:', error)
       let errorMessage = 'A apărut o eroare la încărcarea datelor'
@@ -179,8 +209,8 @@ function App() {
     const existingStock = portfolio.find(item => item.symbol === symbol.toUpperCase())
     if (existingStock) {
       // Actualizăm numărul de acțiuni dacă simbolul există deja
-      setPortfolio(prev =>
-        prev.map(item =>
+      updatePortfolio(
+        portfolio.map(item =>
           item.symbol === symbol.toUpperCase()
             ? { ...item, shares: item.shares + shares }
             : item
@@ -196,7 +226,7 @@ function App() {
         nextDividendDate: stockData.nextDividendDate,
         dividendFrequency: stockData.dividendFrequency
       }
-      setPortfolio(prev => [...prev, newItem])
+      updatePortfolio([...portfolio, newItem])
     }
 
     // Resetăm numărul de acțiuni și afișăm un mesaj de succes
@@ -220,11 +250,11 @@ function App() {
   const updateShares = (symbol: string, newShares: number) => {
     if (newShares <= 0) {
       // Dacă numărul de acțiuni este 0 sau negativ, eliminăm acțiunea din portofoliu
-      setPortfolio(prev => prev.filter(item => item.symbol !== symbol))
+      updatePortfolio(portfolio.filter(item => item.symbol !== symbol))
     } else {
       // Altfel, actualizăm numărul de acțiuni
-      setPortfolio(prev =>
-        prev.map(item =>
+      updatePortfolio(
+        portfolio.map(item =>
           item.symbol === symbol
             ? { ...item, shares: newShares }
             : item
@@ -276,7 +306,7 @@ function App() {
               <input
                 type="text"
                 value={symbol}
-                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                onChange={(e) => updateSymbol(e.target.value.toUpperCase())}
                 placeholder="Introduceți simbolul (ex: AAPL)"
                 className="w-full px-6 py-4 bg-white/5 border border-violet-500/30 rounded-lg focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 text-lg"
                 onKeyDown={(e) => e.key === 'Enter' && searchStock()}
