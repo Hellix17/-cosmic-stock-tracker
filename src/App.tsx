@@ -30,7 +30,8 @@ interface StockData {
   prices: number[]
   dividendPerShare: number
   nextDividendDate: string
-  dividendFrequency: 'Quarterly' | 'Annually' | 'Monthly' | 'Semi-Annually'
+  dividendFrequency: 'Quarterly' | 'Annually' | 'Monthly' | 'Semi-Annually' | 'Unknown'
+  companyName: string
 }
 
 interface PortfolioItem {
@@ -40,7 +41,10 @@ interface PortfolioItem {
   dividendPerShare: number
   nextDividendDate: string
   dividendFrequency: string
+  companyName: string
 }
+
+const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY as string
 
 function App() {
   const [symbol, setSymbol] = useState('')
@@ -48,24 +52,84 @@ function App() {
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([])
   const [loading, setLoading] = useState(false)
   const [selectedShares, setSelectedShares] = useState('1')
+  const [error, setError] = useState<string | null>(null)
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp * 1000).toISOString().split('T')[0]
+  }
+
+  const getDividendFrequency = (dividendHistory: any[]) => {
+    if (dividendHistory.length < 2) return 'Unknown'
+    
+    const intervals = dividendHistory
+      .slice(1)
+      .map((_, i) => {
+        const diff = dividendHistory[i].date - dividendHistory[i + 1].date
+        return Math.round(diff / (24 * 60 * 60))
+      })
+
+    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
+
+    if (avgInterval <= 35) return 'Monthly'
+    if (avgInterval <= 100) return 'Quarterly'
+    if (avgInterval <= 190) return 'Semi-Annually'
+    return 'Annually'
+  }
 
   const searchStock = async () => {
     if (!symbol) return
-    
+    setError(null)
     setLoading(true)
+    
     try {
-      // Aici vom adăuga integrarea cu API-ul Finnhub
-      const demoData: StockData = {
-        labels: Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`),
-        prices: Array.from({ length: 30 }, () => Math.random() * 100 + 50),
-        dividendPerShare: Number((Math.random() * 5).toFixed(2)),
-        nextDividendDate: '2024-04-15',
-        dividendFrequency: 'Quarterly'
+      // Obținem datele companiei
+      const companyResponse = await fetch(
+        `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
+      )
+      const companyData = await companyResponse.json()
+      
+      if (!companyData.name) {
+        throw new Error('Simbol invalid sau companie negăsită')
       }
-      setStockData(demoData)
+
+      // Obținem istoricul prețurilor
+      const today = Math.floor(Date.now() / 1000)
+      const oneMonthAgo = today - 30 * 24 * 60 * 60
+      const candlesResponse = await fetch(
+        `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${oneMonthAgo}&to=${today}&token=${FINNHUB_API_KEY}`
+      )
+      const candlesData = await candlesResponse.json()
+
+      if (candlesData.s === 'no_data') {
+        throw new Error('Nu există date disponibile pentru acest simbol')
+      }
+
+      // Obținem datele despre dividende
+      const dividendsResponse = await fetch(
+        `https://finnhub.io/api/v1/stock/dividend2?symbol=${symbol}&from=${oneMonthAgo}&to=${today + 365 * 24 * 60 * 60}&token=${FINNHUB_API_KEY}`
+      )
+      const dividendsData = await dividendsResponse.json()
+
+      // Calculăm următoarea dată de dividend și frecvența
+      const sortedDividends = dividendsData.sort((a: any, b: any) => b.date - a.date)
+      const nextDividend = sortedDividends[0]
+      const dividendFrequency = getDividendFrequency(sortedDividends)
+
+      const stockData: StockData = {
+        labels: candlesData.t.map(formatDate),
+        prices: candlesData.c,
+        dividendPerShare: nextDividend?.amount || 0,
+        nextDividendDate: nextDividend ? formatDate(nextDividend.date) : 'N/A',
+        dividendFrequency: dividendFrequency,
+        companyName: companyData.name
+      }
+
+      setStockData(stockData)
     } catch (error) {
       console.error('Error fetching stock data:', error)
+      setError(error instanceof Error ? error.message : 'A apărut o eroare la încărcarea datelor')
     }
+    
     setLoading(false)
   }
 
@@ -81,7 +145,8 @@ function App() {
       price: lastPrice,
       dividendPerShare: stockData.dividendPerShare,
       nextDividendDate: stockData.nextDividendDate,
-      dividendFrequency: stockData.dividendFrequency
+      dividendFrequency: stockData.dividendFrequency,
+      companyName: stockData.companyName
     }])
     setSelectedShares('1')
   }
@@ -99,11 +164,23 @@ function App() {
     return (item.shares * item.dividendPerShare).toFixed(2)
   }
 
+  const calculateAnnualDividend = (item: PortfolioItem) => {
+    const multiplier = {
+      'Monthly': 12,
+      'Quarterly': 4,
+      'Semi-Annually': 2,
+      'Annually': 1,
+      'Unknown': 0
+    }[item.dividendFrequency] || 0
+
+    return (item.shares * item.dividendPerShare * multiplier).toFixed(2)
+  }
+
   const chartData: ChartData<'line'> | null = stockData ? {
     labels: stockData.labels,
     datasets: [
       {
-        label: symbol.toUpperCase(),
+        label: `${symbol} - ${stockData.companyName}`,
         data: stockData.prices,
         fill: true,
         borderColor: '#9D4EDD',
@@ -122,17 +199,30 @@ function App() {
           color: '#ffffff'
         }
       },
+      tooltip: {
+        callbacks: {
+          label: (context: any) => `$${context.raw.toFixed(2)}`
+        }
+      }
     },
     scales: {
       y: {
+        type: 'linear' as const,
         grid: {
           color: 'rgba(157, 78, 221, 0.1)'
         },
         ticks: {
-          color: '#B4A5CD'
+          color: '#B4A5CD',
+          callback: (value: number | string) => {
+            if (typeof value === 'number') {
+              return `$${value.toFixed(2)}`
+            }
+            return value
+          }
         }
       },
       x: {
+        type: 'category' as const,
         grid: {
           color: 'rgba(157, 78, 221, 0.1)'
         },
@@ -141,7 +231,7 @@ function App() {
         }
       }
     }
-  }
+  } as const
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-primary-bg to-secondary-bg p-4">
@@ -184,12 +274,19 @@ function App() {
                   />
                 </svg>
               </button>
+              {error && (
+                <div className="text-red-400 text-sm mt-2">
+                  {error}
+                </div>
+              )}
             </div>
           </div>
 
           {/* Chart Panel */}
           <div className="cosmic-card lg:col-span-2">
-            <h2 className="text-2xl font-semibold mb-4 gradient-text">Price Chart</h2>
+            <h2 className="text-2xl font-semibold mb-4 gradient-text">
+              {stockData ? `${symbol} - ${stockData.companyName}` : 'Price Chart'}
+            </h2>
             {stockData ? (
               <>
                 <div className="cosmic-chart mb-4">
@@ -213,7 +310,7 @@ function App() {
                   </button>
                 </div>
                 <div className="text-text-secondary space-y-2">
-                  <p>Dividend per Share: ${stockData.dividendPerShare}</p>
+                  <p>Dividend per Share: ${stockData.dividendPerShare.toFixed(2)}</p>
                   <p>Next Dividend Date: {stockData.nextDividendDate}</p>
                   <p>Frequency: {stockData.dividendFrequency}</p>
                 </div>
@@ -234,11 +331,13 @@ function App() {
                   <thead>
                     <tr className="text-left text-text-secondary">
                       <th className="p-2">Symbol</th>
+                      <th className="p-2">Company</th>
                       <th className="p-2">Shares</th>
                       <th className="p-2">Price</th>
                       <th className="p-2">Total Value</th>
                       <th className="p-2">Next Dividend Date</th>
-                      <th className="p-2">Expected Dividend</th>
+                      <th className="p-2">Next Dividend</th>
+                      <th className="p-2">Annual Dividend</th>
                       <th className="p-2">Frequency</th>
                     </tr>
                   </thead>
@@ -246,6 +345,7 @@ function App() {
                     {portfolio.map((item, index) => (
                       <tr key={index} className="border-t border-accent-color/10">
                         <td className="p-2">{item.symbol}</td>
+                        <td className="p-2">{item.companyName}</td>
                         <td className="p-2">
                           <input
                             type="number"
@@ -260,6 +360,7 @@ function App() {
                         <td className="p-2">${(item.shares * item.price).toFixed(2)}</td>
                         <td className="p-2">{item.nextDividendDate}</td>
                         <td className="p-2">${calculateNextDividend(item)}</td>
+                        <td className="p-2">${calculateAnnualDividend(item)}</td>
                         <td className="p-2">{item.dividendFrequency}</td>
                       </tr>
                     ))}
