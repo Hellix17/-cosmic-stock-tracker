@@ -100,8 +100,13 @@ function App() {
       )
       const candlesData = await candlesResponse.json()
 
-      if (candlesData.s === 'no_data') {
+      if (candlesData.s === 'no_data' || !candlesData.t || !candlesData.c || !Array.isArray(candlesData.t) || !Array.isArray(candlesData.c)) {
         throw new Error('Nu există date disponibile pentru acest simbol')
+      }
+
+      // Verificăm dacă avem date valide pentru grafic
+      if (candlesData.t.length === 0 || candlesData.c.length === 0) {
+        throw new Error('Nu există suficiente date pentru a afișa graficul')
       }
 
       // Obținem datele despre dividende
