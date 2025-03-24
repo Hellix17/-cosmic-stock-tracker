@@ -106,16 +106,36 @@ function App() {
       // Obținem istoricul prețurilor
       const today = Math.floor(Date.now() / 1000)
       const oneMonthAgo = today - 30 * 24 * 60 * 60
+      
+      console.log('Requesting candles data with params:', {
+        symbol,
+        from: new Date(oneMonthAgo * 1000).toISOString(),
+        to: new Date(today * 1000).toISOString(),
+        resolution: 'D'
+      })
+
       const candlesResponse = await fetch(
         `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${oneMonthAgo}&to=${today}&token=${FINNHUB_API_KEY}`
       )
 
+      console.log('Candles Response Status:', candlesResponse.status)
+      console.log('Candles Response Headers:', Object.fromEntries(candlesResponse.headers.entries()))
+
       if (!candlesResponse.ok) {
-        throw new Error(`Eroare la obținerea datelor despre prețuri: ${candlesResponse.statusText}`)
+        const errorText = await candlesResponse.text()
+        console.error('Candles Error Response:', errorText)
+        
+        if (candlesResponse.status === 429) {
+          throw new Error('Limită de rate API depășită. Te rugăm să aștepți câteva secunde și să încerci din nou.')
+        } else if (candlesResponse.status === 403) {
+          throw new Error('Cheie API invalidă sau expirată.')
+        } else {
+          throw new Error(`Eroare la obținerea datelor despre prețuri: ${candlesResponse.status} - ${errorText || candlesResponse.statusText}`)
+        }
       }
 
       const candlesData = await candlesResponse.json()
-      console.log('Candles Data:', candlesData) // Pentru debugging
+      console.log('Candles Data:', candlesData)
 
       if (!candlesData || typeof candlesData !== 'object') {
         throw new Error('Format invalid pentru datele despre prețuri')
