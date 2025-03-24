@@ -3,11 +3,12 @@
 @tailwind utilities;
 
 :root {
-  --primary-bg: #0f172a;
-  --secondary-bg: #1e293b;
+  --primary-bg: #0F0720;
+  --secondary-bg: #1A0B2E;
   --text-primary: #ffffff;
-  --text-secondary: #94a3b8;
-  --accent-color: #4ade80;
+  --text-secondary: #B4A5CD;
+  --accent-color: #9D4EDD;
+  --accent-color-light: #C77DFF;
 }
 
 body {
@@ -22,8 +23,8 @@ body {
 }
 
 .cosmic-input {
-  background: rgba(26, 26, 46, 0.8);
-  border: 1px solid rgba(74, 222, 128, 0.2);
+  background: rgba(26, 11, 46, 0.8);
+  border: 1px solid rgba(157, 78, 221, 0.2);
   border-radius: 8px;
   color: white;
   transition: all 0.3s ease;
@@ -31,12 +32,12 @@ body {
 
 .cosmic-input:focus {
   outline: none;
-  border-color: rgba(74, 222, 128, 0.5);
-  box-shadow: 0 0 15px rgba(74, 222, 128, 0.2);
+  border-color: rgba(157, 78, 221, 0.5);
+  box-shadow: 0 0 15px rgba(157, 78, 221, 0.2);
 }
 
 .cosmic-button {
-  background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #9D4EDD 0%, #6A0DAD 100%);
   padding: 0.5rem 1.5rem;
   border-radius: 8px;
   color: white;
@@ -51,7 +52,7 @@ body {
 
 .cosmic-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(74, 222, 128, 0.3);
+  box-shadow: 0 5px 15px rgba(157, 78, 221, 0.3);
 }
 
 .cosmic-button:active {
@@ -59,8 +60,29 @@ body {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #C77DFF 0%, #9D4EDD 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.cosmic-card {
+  background: rgba(26, 11, 46, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(157, 78, 221, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+}
+
+.cosmic-card:hover {
+  border-color: rgba(157, 78, 221, 0.4);
+  box-shadow: 0 8px 20px rgba(157, 78, 221, 0.15);
+}
+
+.cosmic-chart {
+  background: rgba(26, 11, 46, 0.6);
+  border-radius: 12px;
+  padding: 1rem;
+  border: 1px solid rgba(157, 78, 221, 0.2);
 } 
