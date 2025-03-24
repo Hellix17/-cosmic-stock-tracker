@@ -47,10 +47,6 @@ interface MarketStackEOD {
   date: string
 }
 
-interface MarketStackCompany {
-  name: string
-}
-
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
   return date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' })
@@ -141,7 +137,10 @@ function App() {
       if (!companyResponse.ok) {
         throw new Error(`Eroare la obținerea datelor companiei: ${companyResponse.statusText}`)
       }
-      const companyData: MarketStackCompany = await companyResponse.json()
+      const companyDataResponse = await companyResponse.json()
+      const companyData = {
+        name: companyDataResponse.data?.name || symbol.toUpperCase()
+      }
 
       // Obținem istoricul prețurilor
       const endDate = new Date().toISOString().split('T')[0]
@@ -155,13 +154,18 @@ function App() {
         throw new Error(`Eroare la obținerea datelor EOD: ${eodResponse.statusText}`)
       }
       const eodData = await eodResponse.json()
-      const stockPrices: MarketStackEOD[] = eodData.data || []
-
-      if (!stockPrices.length) {
+      console.log('Răspuns EOD:', eodData)
+      
+      if (!eodData.data || !Array.isArray(eodData.data) || eodData.data.length === 0) {
         throw new Error('Nu există date disponibile pentru acest simbol')
       }
 
-      // Simulăm date despre dividende (MarketStack nu oferă date despre dividende în planul gratuit)
+      const stockPrices: MarketStackEOD[] = eodData.data.map((item: any) => ({
+        close: item.close || 0,
+        date: item.date
+      }))
+
+      // Simulăm date despre dividende
       const mockDividend = {
         amount: (stockPrices[0]?.close || 0) * 0.02, // 2% dividend yield
         nextDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -273,6 +277,25 @@ function App() {
     }
   }
 
+  const deleteFromPortfolio = async (itemId: number) => {
+    try {
+      if (!userId) return
+
+      const { error } = await supabase
+        .from('portfolio')
+        .delete()
+        .eq('id', itemId)
+        .eq('user_id', userId)
+
+      if (error) throw error
+
+      setPortfolio(prev => prev.filter(item => item.id !== itemId))
+    } catch (error) {
+      console.error('Eroare la ștergerea din portofoliu:', error)
+      setError('Eroare la ștergerea din portofoliu')
+    }
+  }
+
   const chartData: ChartData<'line'> | null = stockData ? {
     labels: stockData.labels,
     datasets: [
@@ -375,6 +398,7 @@ function App() {
                         <th className="text-right p-2">Dividend estimat</th>
                         <th className="text-left p-2">Următorul dividend</th>
                         <th className="text-left p-2">Frecvență</th>
+                        <th className="text-center p-2">Acțiuni</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -397,6 +421,14 @@ function App() {
                           <td className="text-right p-2">${(item.dividendPerShare * item.shares).toFixed(2)}</td>
                           <td className="p-2">{item.nextDividendDate}</td>
                           <td className="p-2">{item.dividendFrequency}</td>
+                          <td className="p-2 text-center">
+                            <button
+                              onClick={() => item.id && deleteFromPortfolio(item.id)}
+                              className="px-3 py-1 bg-red-600 rounded hover:bg-red-500 transition-colors text-sm"
+                            >
+                              Șterge
+                            </button>
+                          </td>
                         </tr>
                       ))}
                       <tr className="border-t border-violet-500/30 font-semibold">
@@ -410,6 +442,7 @@ function App() {
                         <td className="text-right p-2">
                           ${portfolio.reduce((sum, item) => sum + item.dividendPerShare * item.shares, 0).toFixed(2)}
                         </td>
+                        <td className="p-2"></td>
                         <td className="p-2"></td>
                         <td className="p-2"></td>
                       </tr>
