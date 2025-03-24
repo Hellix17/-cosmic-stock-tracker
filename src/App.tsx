@@ -9,11 +9,8 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler,
   ChartData
 } from 'chart.js'
-import finnhub, { CompanyProfile, StockCandles, StockDividend } from 'finnhub'
-import './App.css'
 
 ChartJS.register(
   CategoryScale,
@@ -22,21 +19,16 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend,
-  Filler
+  Legend
 )
-
-// Configurare client Finnhub
-const finnhubClient = new finnhub.DefaultApi()
-finnhub.ApiClient.instance.authentications['api_key'].apiKey = import.meta.env.VITE_FINNHUB_API_KEY as string
 
 interface StockData {
   labels: string[]
   prices: number[]
+  companyName: string
   dividendPerShare: number
   nextDividendDate: string
-  dividendFrequency: 'Quarterly' | 'Annually' | 'Monthly' | 'Semi-Annually' | 'Unknown'
-  companyName: string
+  dividendFrequency: string
 }
 
 interface PortfolioItem {
@@ -46,104 +38,109 @@ interface PortfolioItem {
   dividendPerShare: number
   nextDividendDate: string
   dividendFrequency: string
-  companyName: string
+}
+
+interface MarketStackEOD {
+  close: number
+  date: string
+}
+
+interface MarketStackCompany {
+  name: string
+}
+
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' })
 }
 
 function App() {
   const [symbol, setSymbol] = useState('')
   const [stockData, setStockData] = useState<StockData | null>(null)
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([])
-  const [loading, setLoading] = useState(false)
-  const [selectedShares, setSelectedShares] = useState('1')
   const [error, setError] = useState<string | null>(null)
-
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toISOString().split('T')[0]
-  }
-
-  const getDividendFrequency = (dividendHistory: any[]) => {
-    if (dividendHistory.length < 2) return 'Unknown'
-    
-    const intervals = dividendHistory
-      .slice(1)
-      .map((_, i) => {
-        const diff = dividendHistory[i].date - dividendHistory[i + 1].date
-        return Math.round(diff / (24 * 60 * 60))
-      })
-
-    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length
-
-    if (avgInterval <= 35) return 'Monthly'
-    if (avgInterval <= 100) return 'Quarterly'
-    if (avgInterval <= 190) return 'Semi-Annually'
-    return 'Annually'
-  }
+  const [loading, setLoading] = useState(false)
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([])
+  const [shares, setShares] = useState<number>(1)
 
   const searchStock = async () => {
     if (!symbol) return
     setError(null)
     setLoading(true)
     setStockData(null)
+
+    const API_KEY = import.meta.env.VITE_MARKETSTACK_API_KEY
+    const BASE_URL = 'http://api.marketstack.com/v1'
     
     try {
-      // Obținem datele companiei
-      const companyData = await new Promise<CompanyProfile>((resolve, reject) => {
-        finnhubClient.companyProfile2({ symbol }, (error, data) => {
-          if (error) reject(error)
-          else resolve(data)
-        })
-      })
+      console.log('Începem căutarea pentru simbolul:', symbol)
+      console.log('Folosim cheia API:', API_KEY ? 'DA' : 'NU')
 
-      if (!companyData || !companyData.name) {
-        throw new Error('Simbol invalid sau companie negăsită')
+      if (!API_KEY) {
+        throw new Error('Cheia API MarketStack nu este configurată corect')
       }
 
+      // Obținem datele companiei
+      console.log('Încercăm să obținem datele companiei...')
+      const companyResponse = await fetch(`${BASE_URL}/tickers/${symbol}?access_key=${API_KEY}`)
+      if (!companyResponse.ok) {
+        throw new Error(`Eroare la obținerea datelor companiei: ${companyResponse.statusText}`)
+      }
+      const companyData: MarketStackCompany = await companyResponse.json()
+
       // Obținem istoricul prețurilor
-      const today = Math.floor(Date.now() / 1000)
-      const oneMonthAgo = today - 30 * 24 * 60 * 60
+      const endDate = new Date().toISOString().split('T')[0]
+      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      
+      console.log('Încercăm să obținem datele despre prețuri...')
+      const eodResponse = await fetch(
+        `${BASE_URL}/eod?access_key=${API_KEY}&symbols=${symbol}&date_from=${startDate}&date_to=${endDate}&limit=30`
+      )
+      if (!eodResponse.ok) {
+        throw new Error(`Eroare la obținerea datelor EOD: ${eodResponse.statusText}`)
+      }
+      const eodData = await eodResponse.json()
+      const stockPrices: MarketStackEOD[] = eodData.data || []
 
-      const candlesData = await new Promise<StockCandles>((resolve, reject) => {
-        finnhubClient.stockCandles(symbol, 'D', oneMonthAgo, today, (error, data) => {
-          if (error) reject(error)
-          else resolve(data)
-        })
-      })
-
-      if (!candlesData || candlesData.s === 'no_data') {
+      if (!stockPrices.length) {
         throw new Error('Nu există date disponibile pentru acest simbol')
       }
 
-      // Obținem datele despre dividende
-      const fromDate = new Date(oneMonthAgo * 1000).toISOString().split('T')[0]
-      const toDate = new Date((today + 365 * 24 * 60 * 60) * 1000).toISOString().split('T')[0]
-
-      const dividendsData = await new Promise<StockDividend[]>((resolve, reject) => {
-        finnhubClient.stockDividends(symbol, fromDate, toDate, (error, data) => {
-          if (error) reject(error)
-          else resolve(data)
-        })
-      })
-
-      // Verificăm dacă avem un array valid de dividende
-      const sortedDividends = Array.isArray(dividendsData) && dividendsData.length > 0
-        ? dividendsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        : []
-      const nextDividend = sortedDividends[0]
-      const dividendFrequency = Array.isArray(dividendsData) ? getDividendFrequency(dividendsData) : 'Unknown'
-
-      const stockData: StockData = {
-        labels: candlesData.t.map(formatDate),
-        prices: candlesData.c,
-        dividendPerShare: nextDividend?.amount || 0,
-        nextDividendDate: nextDividend ? nextDividend.date : 'N/A',
-        dividendFrequency: dividendFrequency,
-        companyName: companyData.name
+      // Simulăm date despre dividende (MarketStack nu oferă date despre dividende în planul gratuit)
+      const mockDividend = {
+        amount: (stockPrices[0]?.close || 0) * 0.02, // 2% dividend yield
+        nextDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        frequency: 'Trimestrial'
       }
 
+      console.log('Construim obiectul stockData...')
+      const stockData: StockData = {
+        labels: stockPrices.map(day => formatDate(day.date)).reverse(),
+        prices: stockPrices.map(day => day.close).reverse(),
+        companyName: companyData.name,
+        dividendPerShare: mockDividend.amount,
+        nextDividendDate: mockDividend.nextDate,
+        dividendFrequency: mockDividend.frequency
+      }
+
+      console.log('StockData final:', stockData)
       setStockData(stockData)
     } catch (error) {
-      console.error('Error fetching stock data:', error)
-      setError(error instanceof Error ? error.message : 'A apărut o eroare la încărcarea datelor')
+      console.error('Eroare completă:', error)
+      let errorMessage = 'A apărut o eroare la încărcarea datelor'
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          errorMessage = 'Eroare de conexiune. Verificați conexiunea la internet și încercați din nou.'
+        } else if (error.message.includes('NetworkError')) {
+          errorMessage = 'Eroare de rețea. Verificați dacă aveți acces la internet.'
+        } else if (error.message.includes('402')) {
+          errorMessage = 'Limită API depășită. Încercați mai târziu.'
+        } else {
+          errorMessage = error.message
+        }
+      }
+      
+      setError(errorMessage)
       setStockData(null)
     } finally {
       setLoading(false)
@@ -152,246 +149,178 @@ function App() {
 
   const addToPortfolio = () => {
     if (!stockData) return
-    const lastPrice = stockData.prices[stockData.prices.length - 1]
-    const shares = parseFloat(selectedShares)
-    if (isNaN(shares) || shares <= 0) return
 
-    setPortfolio([...portfolio, {
-      symbol,
-      shares,
-      price: lastPrice,
+    const newItem: PortfolioItem = {
+      symbol: symbol.toUpperCase(),
+      shares: shares,
+      price: stockData.prices[stockData.prices.length - 1],
       dividendPerShare: stockData.dividendPerShare,
       nextDividendDate: stockData.nextDividendDate,
-      dividendFrequency: stockData.dividendFrequency,
-      companyName: stockData.companyName
-    }])
-    setSelectedShares('1')
+      dividendFrequency: stockData.dividendFrequency
+    }
+
+    setPortfolio(prev => [...prev, newItem])
+    setShares(1)
   }
 
-  const updateShares = (index: number, newShares: string) => {
-    const shares = parseFloat(newShares)
-    if (isNaN(shares) || shares < 0) return
-
-    const newPortfolio = [...portfolio]
-    newPortfolio[index] = { ...newPortfolio[index], shares }
-    setPortfolio(newPortfolio)
-  }
-
-  const calculateNextDividend = (item: PortfolioItem) => {
-    return (item.shares * item.dividendPerShare).toFixed(2)
-  }
-
-  const calculateAnnualDividend = (item: PortfolioItem) => {
-    const multiplier = {
-      'Monthly': 12,
-      'Quarterly': 4,
-      'Semi-Annually': 2,
-      'Annually': 1,
-      'Unknown': 0
-    }[item.dividendFrequency] || 0
-
-    return (item.shares * item.dividendPerShare * multiplier).toFixed(2)
+  const updateShares = (symbol: string, newShares: number) => {
+    setPortfolio(prev =>
+      prev.map(item =>
+        item.symbol === symbol
+          ? { ...item, shares: newShares }
+          : item
+      )
+    )
   }
 
   const chartData: ChartData<'line'> | null = stockData ? {
     labels: stockData.labels,
     datasets: [
       {
-        label: `${symbol} - ${stockData.companyName}`,
+        label: 'Preț acțiune',
         data: stockData.prices,
-        fill: true,
-        borderColor: '#9D4EDD',
-        backgroundColor: 'rgba(157, 78, 221, 0.1)',
-        tension: 0.4,
-      },
-    ],
+        borderColor: 'rgb(139, 92, 246)',
+        backgroundColor: 'rgba(139, 92, 246, 0.5)',
+        tension: 0.1
+      }
+    ]
   } : null
 
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-        labels: {
-          color: '#ffffff'
-        }
-      },
-      tooltip: {
-        callbacks: {
-          label: (context: any) => `$${context.raw.toFixed(2)}`
-        }
-      }
-    },
-    scales: {
-      y: {
-        type: 'linear' as const,
-        grid: {
-          color: 'rgba(157, 78, 221, 0.1)'
-        },
-        ticks: {
-          color: '#B4A5CD',
-          callback: (value: number | string) => {
-            if (typeof value === 'number') {
-              return `$${value.toFixed(2)}`
-            }
-            return value
-          }
-        }
-      },
-      x: {
-        type: 'category' as const,
-        grid: {
-          color: 'rgba(157, 78, 221, 0.1)'
-        },
-        ticks: {
-          color: '#B4A5CD'
-        }
-      }
-    }
-  } as const
-
   return (
-    <div className="min-h-screen bg-gradient-to-b from-primary-bg to-secondary-bg p-4">
-      <header className="container mx-auto py-6">
-        <h1 className="text-4xl font-bold gradient-text">Cosmic Stock Tracker</h1>
-      </header>
-      
-      <main className="container mx-auto mt-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Search Panel */}
-          <div className="cosmic-card">
-            <h2 className="text-2xl font-semibold mb-4 gradient-text">Stock Search</h2>
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Enter stock symbol..."
-                className="cosmic-input w-full p-2"
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                onKeyPress={(e) => e.key === 'Enter' && searchStock()}
-              />
-              <button 
-                className="cosmic-button w-full"
-                onClick={searchStock}
-                disabled={loading}
-              >
-                {loading ? 'Searching...' : 'Search'}
-                <svg
-                  className="w-5 h-5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-              </button>
-              {error && (
-                <div className="text-red-400 text-sm mt-2">
-                  {error}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Chart Panel */}
-          <div className="cosmic-card lg:col-span-2">
-            <h2 className="text-2xl font-semibold mb-4 gradient-text">
-              {stockData ? `${symbol} - ${stockData.companyName}` : 'Price Chart'}
-            </h2>
-            {stockData ? (
-              <>
-                <div className="cosmic-chart mb-4">
-                  {chartData && <Line data={chartData} options={chartOptions} />}
-                </div>
-                <div className="flex gap-4 items-center mb-4">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    className="cosmic-input p-2 w-32"
-                    value={selectedShares}
-                    onChange={(e) => setSelectedShares(e.target.value)}
-                    placeholder="Shares"
-                  />
-                  <button 
-                    className="cosmic-button"
-                    onClick={addToPortfolio}
-                  >
-                    Add to Portfolio
-                  </button>
-                </div>
-                <div className="text-text-secondary space-y-2">
-                  <p>Dividend per Share: ${stockData.dividendPerShare.toFixed(2)}</p>
-                  <p>Next Dividend Date: {stockData.nextDividendDate}</p>
-                  <p>Frequency: {stockData.dividendFrequency}</p>
-                </div>
-              </>
-            ) : (
-              <div className="text-center text-text-secondary py-12">
-                Search for a stock to see its price chart
-              </div>
-            )}
-          </div>
-
-          {/* Portfolio Panel */}
-          <div className="cosmic-card lg:col-span-3">
-            <h2 className="text-2xl font-semibold mb-4 gradient-text">Portfolio</h2>
-            {portfolio.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left text-text-secondary">
-                      <th className="p-2">Symbol</th>
-                      <th className="p-2">Company</th>
-                      <th className="p-2">Shares</th>
-                      <th className="p-2">Price</th>
-                      <th className="p-2">Total Value</th>
-                      <th className="p-2">Next Dividend Date</th>
-                      <th className="p-2">Next Dividend</th>
-                      <th className="p-2">Annual Dividend</th>
-                      <th className="p-2">Frequency</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {portfolio.map((item, index) => (
-                      <tr key={index} className="border-t border-accent-color/10">
-                        <td className="p-2">{item.symbol}</td>
-                        <td className="p-2">{item.companyName}</td>
-                        <td className="p-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            className="cosmic-input p-1 w-24"
-                            value={item.shares}
-                            onChange={(e) => updateShares(index, e.target.value)}
-                          />
-                        </td>
-                        <td className="p-2">${item.price.toFixed(2)}</td>
-                        <td className="p-2">${(item.shares * item.price).toFixed(2)}</td>
-                        <td className="p-2">{item.nextDividendDate}</td>
-                        <td className="p-2">${calculateNextDividend(item)}</td>
-                        <td className="p-2">${calculateAnnualDividend(item)}</td>
-                        <td className="p-2">{item.dividendFrequency}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center text-text-secondary py-8">
-                Your portfolio is empty. Add some stocks!
-              </div>
-            )}
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-violet-950 text-white p-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-4xl font-bold text-center mb-8">Cosmic Stock Tracker</h1>
+        
+        <div className="flex gap-4 mb-8">
+          <input
+            type="text"
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+            placeholder="Introduceți simbolul (ex: AAPL)"
+            className="flex-1 p-2 rounded bg-violet-900/50 border border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400"
+            onKeyDown={(e) => e.key === 'Enter' && searchStock()}
+          />
+          <button
+            onClick={searchStock}
+            disabled={loading}
+            className="px-6 py-2 bg-violet-600 rounded hover:bg-violet-500 transition-colors disabled:opacity-50"
+          >
+            {loading ? 'Se încarcă...' : 'Caută'}
+          </button>
         </div>
-      </main>
+
+        {error && (
+          <div className="mb-8 p-4 bg-red-500/20 border border-red-500 rounded text-red-200">
+            {error}
+          </div>
+        )}
+
+        {stockData && (
+          <div className="space-y-8">
+            <div className="bg-violet-900/20 p-6 rounded-lg border border-violet-500/30">
+              <h2 className="text-2xl font-semibold mb-4">{stockData.companyName} ({symbol.toUpperCase()})</h2>
+              <div className="h-[400px]">
+                {chartData && <Line data={chartData} options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  scales: {
+                    y: {
+                      ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+                      grid: { color: 'rgba(139, 92, 246, 0.1)' }
+                    },
+                    x: {
+                      ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+                      grid: { color: 'rgba(139, 92, 246, 0.1)' }
+                    }
+                  },
+                  plugins: {
+                    legend: { labels: { color: 'rgba(255, 255, 255, 0.9)' } }
+                  }
+                }} />}
+              </div>
+            </div>
+
+            <div className="bg-violet-900/20 p-6 rounded-lg border border-violet-500/30">
+              <h3 className="text-xl font-semibold mb-4">Adaugă la portofoliu</h3>
+              <div className="flex gap-4 items-center">
+                <input
+                  type="number"
+                  value={shares}
+                  onChange={(e) => setShares(Math.max(0.01, Number(e.target.value)))}
+                  step="0.01"
+                  min="0.01"
+                  className="w-32 p-2 rounded bg-violet-900/50 border border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                />
+                <button
+                  onClick={addToPortfolio}
+                  className="px-6 py-2 bg-violet-600 rounded hover:bg-violet-500 transition-colors"
+                >
+                  Adaugă la portofoliu
+                </button>
+              </div>
+            </div>
+
+            {portfolio.length > 0 && (
+              <div className="bg-violet-900/20 p-6 rounded-lg border border-violet-500/30">
+                <h3 className="text-xl font-semibold mb-4">Portofoliul meu</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-violet-300">
+                        <th className="text-left p-2">Simbol</th>
+                        <th className="text-left p-2">Acțiuni</th>
+                        <th className="text-right p-2">Preț/acțiune</th>
+                        <th className="text-right p-2">Valoare totală</th>
+                        <th className="text-right p-2">Dividend/acțiune</th>
+                        <th className="text-right p-2">Dividend estimat</th>
+                        <th className="text-left p-2">Următorul dividend</th>
+                        <th className="text-left p-2">Frecvență</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {portfolio.map((item) => (
+                        <tr key={item.symbol} className="border-t border-violet-500/30">
+                          <td className="p-2">{item.symbol}</td>
+                          <td className="p-2">
+                            <input
+                              type="number"
+                              value={item.shares}
+                              onChange={(e) => updateShares(item.symbol, Math.max(0.01, Number(e.target.value)))}
+                              step="0.01"
+                              min="0.01"
+                              className="w-24 p-1 rounded bg-violet-900/50 border border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                            />
+                          </td>
+                          <td className="text-right p-2">${item.price.toFixed(2)}</td>
+                          <td className="text-right p-2">${(item.price * item.shares).toFixed(2)}</td>
+                          <td className="text-right p-2">${item.dividendPerShare.toFixed(3)}</td>
+                          <td className="text-right p-2">${(item.dividendPerShare * item.shares).toFixed(2)}</td>
+                          <td className="p-2">{item.nextDividendDate}</td>
+                          <td className="p-2">{item.dividendFrequency}</td>
+                        </tr>
+                      ))}
+                      <tr className="border-t border-violet-500/30 font-semibold">
+                        <td className="p-2">Total</td>
+                        <td className="p-2"></td>
+                        <td className="p-2"></td>
+                        <td className="text-right p-2">
+                          ${portfolio.reduce((sum, item) => sum + item.price * item.shares, 0).toFixed(2)}
+                        </td>
+                        <td className="p-2"></td>
+                        <td className="text-right p-2">
+                          ${portfolio.reduce((sum, item) => sum + item.dividendPerShare * item.shares, 0).toFixed(2)}
+                        </td>
+                        <td className="p-2"></td>
+                        <td className="p-2"></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
