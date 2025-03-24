@@ -288,6 +288,12 @@ function App() {
                 Stock Tracker
               </h1>
             </div>
+            <a
+              href="/portfolio"
+              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors text-white font-medium"
+            >
+              Vezi Portofoliul
+            </a>
           </div>
         </header>
 
