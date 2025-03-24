@@ -25,11 +25,29 @@ ChartJS.register(
   Filler
 )
 
+interface StockData {
+  labels: string[]
+  prices: number[]
+  dividendPerShare: number
+  nextDividendDate: string
+  dividendFrequency: 'Quarterly' | 'Annually' | 'Monthly' | 'Semi-Annually'
+}
+
+interface PortfolioItem {
+  symbol: string
+  shares: number
+  price: number
+  dividendPerShare: number
+  nextDividendDate: string
+  dividendFrequency: string
+}
+
 function App() {
   const [symbol, setSymbol] = useState('')
-  const [stockData, setStockData] = useState<any>(null)
-  const [portfolio, setPortfolio] = useState<Array<{ symbol: string, shares: number, price: number }>>([])
+  const [stockData, setStockData] = useState<StockData | null>(null)
+  const [portfolio, setPortfolio] = useState<PortfolioItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [selectedShares, setSelectedShares] = useState('1')
 
   const searchStock = async () => {
     if (!symbol) return
@@ -37,9 +55,12 @@ function App() {
     setLoading(true)
     try {
       // Aici vom adăuga integrarea cu API-ul Finnhub
-      const demoData = {
+      const demoData: StockData = {
         labels: Array.from({ length: 30 }, (_, i) => `Day ${i + 1}`),
-        prices: Array.from({ length: 30 }, () => Math.random() * 100 + 50)
+        prices: Array.from({ length: 30 }, () => Math.random() * 100 + 50),
+        dividendPerShare: Number((Math.random() * 5).toFixed(2)),
+        nextDividendDate: '2024-04-15',
+        dividendFrequency: 'Quarterly'
       }
       setStockData(demoData)
     } catch (error) {
@@ -51,7 +72,31 @@ function App() {
   const addToPortfolio = () => {
     if (!stockData) return
     const lastPrice = stockData.prices[stockData.prices.length - 1]
-    setPortfolio([...portfolio, { symbol, shares: 1, price: lastPrice }])
+    const shares = parseFloat(selectedShares)
+    if (isNaN(shares) || shares <= 0) return
+
+    setPortfolio([...portfolio, {
+      symbol,
+      shares,
+      price: lastPrice,
+      dividendPerShare: stockData.dividendPerShare,
+      nextDividendDate: stockData.nextDividendDate,
+      dividendFrequency: stockData.dividendFrequency
+    }])
+    setSelectedShares('1')
+  }
+
+  const updateShares = (index: number, newShares: string) => {
+    const shares = parseFloat(newShares)
+    if (isNaN(shares) || shares < 0) return
+
+    const newPortfolio = [...portfolio]
+    newPortfolio[index] = { ...newPortfolio[index], shares }
+    setPortfolio(newPortfolio)
+  }
+
+  const calculateNextDividend = (item: PortfolioItem) => {
+    return (item.shares * item.dividendPerShare).toFixed(2)
   }
 
   const chartData: ChartData<'line'> | null = stockData ? {
@@ -150,12 +195,28 @@ function App() {
                 <div className="cosmic-chart mb-4">
                   {chartData && <Line data={chartData} options={chartOptions} />}
                 </div>
-                <button 
-                  className="cosmic-button"
-                  onClick={addToPortfolio}
-                >
-                  Add to Portfolio
-                </button>
+                <div className="flex gap-4 items-center mb-4">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    className="cosmic-input p-2 w-32"
+                    value={selectedShares}
+                    onChange={(e) => setSelectedShares(e.target.value)}
+                    placeholder="Shares"
+                  />
+                  <button 
+                    className="cosmic-button"
+                    onClick={addToPortfolio}
+                  >
+                    Add to Portfolio
+                  </button>
+                </div>
+                <div className="text-text-secondary space-y-2">
+                  <p>Dividend per Share: ${stockData.dividendPerShare}</p>
+                  <p>Next Dividend Date: {stockData.nextDividendDate}</p>
+                  <p>Frequency: {stockData.dividendFrequency}</p>
+                </div>
               </>
             ) : (
               <div className="text-center text-text-secondary py-12">
@@ -176,15 +237,30 @@ function App() {
                       <th className="p-2">Shares</th>
                       <th className="p-2">Price</th>
                       <th className="p-2">Total Value</th>
+                      <th className="p-2">Next Dividend Date</th>
+                      <th className="p-2">Expected Dividend</th>
+                      <th className="p-2">Frequency</th>
                     </tr>
                   </thead>
                   <tbody>
                     {portfolio.map((item, index) => (
                       <tr key={index} className="border-t border-accent-color/10">
                         <td className="p-2">{item.symbol}</td>
-                        <td className="p-2">{item.shares}</td>
+                        <td className="p-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            className="cosmic-input p-1 w-24"
+                            value={item.shares}
+                            onChange={(e) => updateShares(index, e.target.value)}
+                          />
+                        </td>
                         <td className="p-2">${item.price.toFixed(2)}</td>
                         <td className="p-2">${(item.shares * item.price).toFixed(2)}</td>
+                        <td className="p-2">{item.nextDividendDate}</td>
+                        <td className="p-2">${calculateNextDividend(item)}</td>
+                        <td className="p-2">{item.dividendFrequency}</td>
                       </tr>
                     ))}
                   </tbody>
