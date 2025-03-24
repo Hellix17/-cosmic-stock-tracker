@@ -148,29 +148,67 @@ function App() {
   }
 
   const addToPortfolio = () => {
-    if (!stockData) return
-
-    const newItem: PortfolioItem = {
-      symbol: symbol.toUpperCase(),
-      shares: shares,
-      price: stockData.prices[stockData.prices.length - 1],
-      dividendPerShare: stockData.dividendPerShare,
-      nextDividendDate: stockData.nextDividendDate,
-      dividendFrequency: stockData.dividendFrequency
+    if (!stockData) {
+      setError('Nu există date despre acțiuni pentru a adăuga la portofoliu')
+      return
     }
 
-    setPortfolio(prev => [...prev, newItem])
+    // Verificăm dacă acțiunea există deja în portofoliu
+    const existingStock = portfolio.find(item => item.symbol === symbol.toUpperCase())
+    if (existingStock) {
+      // Actualizăm numărul de acțiuni dacă simbolul există deja
+      setPortfolio(prev =>
+        prev.map(item =>
+          item.symbol === symbol.toUpperCase()
+            ? { ...item, shares: item.shares + shares }
+            : item
+        )
+      )
+    } else {
+      // Adăugăm o nouă intrare în portofoliu
+      const newItem: PortfolioItem = {
+        symbol: symbol.toUpperCase(),
+        shares: shares,
+        price: stockData.prices[stockData.prices.length - 1],
+        dividendPerShare: stockData.dividendPerShare,
+        nextDividendDate: stockData.nextDividendDate,
+        dividendFrequency: stockData.dividendFrequency
+      }
+      setPortfolio(prev => [...prev, newItem])
+    }
+
+    // Resetăm numărul de acțiuni și afișăm un mesaj de succes
     setShares(1)
+    setError(null)
+    // Afișăm un mesaj de confirmare temporar
+    const successMessage = existingStock 
+      ? `Am actualizat ${shares} acțiuni pentru ${symbol.toUpperCase()}`
+      : `Am adăugat ${shares} acțiuni noi pentru ${symbol.toUpperCase()}`
+    
+    const tempDiv = document.createElement('div')
+    tempDiv.className = 'fixed bottom-4 right-4 bg-green-500/90 text-white px-6 py-3 rounded-lg shadow-lg'
+    tempDiv.textContent = successMessage
+    document.body.appendChild(tempDiv)
+    
+    setTimeout(() => {
+      document.body.removeChild(tempDiv)
+    }, 3000)
   }
 
   const updateShares = (symbol: string, newShares: number) => {
-    setPortfolio(prev =>
-      prev.map(item =>
-        item.symbol === symbol
-          ? { ...item, shares: newShares }
-          : item
+    if (newShares <= 0) {
+      // Dacă numărul de acțiuni este 0 sau negativ, eliminăm acțiunea din portofoliu
+      setPortfolio(prev => prev.filter(item => item.symbol !== symbol))
+    } else {
+      // Altfel, actualizăm numărul de acțiuni
+      setPortfolio(prev =>
+        prev.map(item =>
+          item.symbol === symbol
+            ? { ...item, shares: newShares }
+            : item
+        )
       )
-    )
+    }
   }
 
   const chartData: ChartData<'line'> | null = stockData ? {
