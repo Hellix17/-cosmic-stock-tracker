@@ -49,6 +49,8 @@ interface MarketStackCompany {
   name: string
 }
 
+type TimePeriod = '1M' | '3M' | '6M' | 'YTD' | '1Y'
+
 const formatDate = (dateStr: string) => {
   const date = new Date(dateStr)
   return date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' })
@@ -61,8 +63,27 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([])
   const [shares, setShares] = useState<number>(1)
+  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1M')
 
-  const searchStock = async () => {
+  const getStartDate = (period: TimePeriod): string => {
+    const now = new Date()
+    switch (period) {
+      case '1M':
+        return new Date(now.setMonth(now.getMonth() - 1)).toISOString().split('T')[0]
+      case '3M':
+        return new Date(now.setMonth(now.getMonth() - 3)).toISOString().split('T')[0]
+      case '6M':
+        return new Date(now.setMonth(now.getMonth() - 6)).toISOString().split('T')[0]
+      case 'YTD':
+        return new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
+      case '1Y':
+        return new Date(now.setFullYear(now.getFullYear() - 1)).toISOString().split('T')[0]
+      default:
+        return new Date(now.setMonth(now.getMonth() - 1)).toISOString().split('T')[0]
+    }
+  }
+
+  const searchStock = async (period: TimePeriod = selectedPeriod) => {
     if (!symbol) return
     setError(null)
     setLoading(true)
@@ -89,11 +110,11 @@ function App() {
 
       // Obținem istoricul prețurilor
       const endDate = new Date().toISOString().split('T')[0]
-      const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const startDate = getStartDate(period)
       
       console.log('Încercăm să obținem datele despre prețuri...')
       const eodResponse = await fetch(
-        `${BASE_URL}/eod?access_key=${API_KEY}&symbols=${symbol}&date_from=${startDate}&date_to=${endDate}&limit=30`
+        `${BASE_URL}/eod?access_key=${API_KEY}&symbols=${symbol}&date_from=${startDate}&date_to=${endDate}&limit=500`
       )
       if (!eodResponse.ok) {
         throw new Error(`Eroare la obținerea datelor EOD: ${eodResponse.statusText}`)
@@ -105,9 +126,9 @@ function App() {
         throw new Error('Nu există date disponibile pentru acest simbol')
       }
 
-      // Simulăm date despre dividende (MarketStack nu oferă date despre dividende în planul gratuit)
+      // Simulăm date despre dividende
       const mockDividend = {
-        amount: (stockPrices[0]?.close || 0) * 0.02, // 2% dividend yield
+        amount: (stockPrices[0]?.close || 0) * 0.02,
         nextDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         frequency: 'Trimestrial'
       }
@@ -124,6 +145,7 @@ function App() {
 
       console.log('StockData final:', stockData)
       setStockData(stockData)
+      setSelectedPeriod(period)
     } catch (error) {
       console.error('Eroare completă:', error)
       let errorMessage = 'A apărut o eroare la încărcarea datelor'
@@ -260,7 +282,7 @@ function App() {
                 onKeyDown={(e) => e.key === 'Enter' && searchStock()}
               />
               <button
-                onClick={searchStock}
+                onClick={() => searchStock()}
                 disabled={loading}
                 className="absolute right-2 px-6 py-2 bg-violet-600 hover:bg-violet-500 rounded-md transition-colors disabled:opacity-50 text-white font-medium"
               >
@@ -279,18 +301,40 @@ function App() {
         {stockData && (
           <div className="space-y-8 mb-20">
             <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-violet-500/30">
-              <h2 className="text-2xl font-semibold mb-6 flex items-center gap-2">
-                <span className="text-violet-400">{symbol.toUpperCase()}</span>
-                <span className="text-gray-400">•</span>
-                <span>{stockData.companyName}</span>
-              </h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-semibold flex items-center gap-2">
+                  <span className="text-violet-400">{symbol.toUpperCase()}</span>
+                  <span className="text-gray-400">•</span>
+                  <span>{stockData.companyName}</span>
+                </h2>
+                <div className="flex gap-2">
+                  {(['1M', '3M', '6M', 'YTD', '1Y'] as TimePeriod[]).map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => {
+                        void searchStock(period)
+                      }}
+                      className={`px-3 py-1 rounded-md transition-colors ${
+                        selectedPeriod === period
+                          ? 'bg-violet-600 text-white'
+                          : 'bg-white/5 hover:bg-white/10 text-violet-300'
+                      }`}
+                    >
+                      {period}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="h-[400px]">
                 {chartData && <Line data={chartData} options={{
                   responsive: true,
                   maintainAspectRatio: false,
                   scales: {
                     y: {
-                      ticks: { color: 'rgba(255, 255, 255, 0.7)' },
+                      ticks: { 
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        callback: (value) => `$${value}`
+                      },
                       grid: { color: 'rgba(139, 92, 246, 0.1)' }
                     },
                     x: {
@@ -302,6 +346,11 @@ function App() {
                     legend: { 
                       labels: { color: 'rgba(255, 255, 255, 0.9)' },
                       display: false
+                    },
+                    tooltip: {
+                      callbacks: {
+                        label: (context) => `$${context.parsed.y.toFixed(2)}`
+                      }
                     }
                   }
                 }} />}
