@@ -80,15 +80,26 @@ function App() {
     if (!symbol) return
     setError(null)
     setLoading(true)
+    setStockData(null) // Resetăm datele anterioare
     
     try {
+      // Verificăm dacă avem cheia API
+      if (!FINNHUB_API_KEY) {
+        throw new Error('Cheia API Finnhub nu este configurată')
+      }
+
       // Obținem datele companiei
       const companyResponse = await fetch(
         `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
       )
+      
+      if (!companyResponse.ok) {
+        throw new Error(`Eroare la obținerea datelor companiei: ${companyResponse.statusText}`)
+      }
+
       const companyData = await companyResponse.json()
       
-      if (!companyData.name) {
+      if (!companyData || !companyData.name) {
         throw new Error('Simbol invalid sau companie negăsită')
       }
 
@@ -98,13 +109,26 @@ function App() {
       const candlesResponse = await fetch(
         `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${oneMonthAgo}&to=${today}&token=${FINNHUB_API_KEY}`
       )
-      const candlesData = await candlesResponse.json()
 
-      if (candlesData.s === 'no_data' || !candlesData.t || !candlesData.c || !Array.isArray(candlesData.t) || !Array.isArray(candlesData.c)) {
+      if (!candlesResponse.ok) {
+        throw new Error(`Eroare la obținerea datelor despre prețuri: ${candlesResponse.statusText}`)
+      }
+
+      const candlesData = await candlesResponse.json()
+      console.log('Candles Data:', candlesData) // Pentru debugging
+
+      if (!candlesData || typeof candlesData !== 'object') {
+        throw new Error('Format invalid pentru datele despre prețuri')
+      }
+
+      if (candlesData.s === 'no_data') {
         throw new Error('Nu există date disponibile pentru acest simbol')
       }
 
-      // Verificăm dacă avem date valide pentru grafic
+      if (!candlesData.t || !Array.isArray(candlesData.t) || !candlesData.c || !Array.isArray(candlesData.c)) {
+        throw new Error('Date incomplete despre prețuri')
+      }
+
       if (candlesData.t.length === 0 || candlesData.c.length === 0) {
         throw new Error('Nu există suficiente date pentru a afișa graficul')
       }
@@ -113,7 +137,13 @@ function App() {
       const dividendsResponse = await fetch(
         `https://finnhub.io/api/v1/stock/dividend2?symbol=${symbol}&from=${oneMonthAgo}&to=${today + 365 * 24 * 60 * 60}&token=${FINNHUB_API_KEY}`
       )
+
+      if (!dividendsResponse.ok) {
+        throw new Error(`Eroare la obținerea datelor despre dividende: ${dividendsResponse.statusText}`)
+      }
+
       const dividendsData = await dividendsResponse.json()
+      console.log('Dividends Data:', dividendsData) // Pentru debugging
 
       // Verificăm dacă avem un array valid de dividende
       const sortedDividends = Array.isArray(dividendsData) && dividendsData.length > 0
@@ -135,9 +165,10 @@ function App() {
     } catch (error) {
       console.error('Error fetching stock data:', error)
       setError(error instanceof Error ? error.message : 'A apărut o eroare la încărcarea datelor')
+      setStockData(null)
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   const addToPortfolio = () => {
