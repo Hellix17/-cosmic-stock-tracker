@@ -12,6 +12,7 @@ import {
   Filler,
   ChartData
 } from 'chart.js'
+import finnhub, { CompanyProfile, StockCandles, StockDividend } from 'finnhub'
 import './App.css'
 
 ChartJS.register(
@@ -24,6 +25,10 @@ ChartJS.register(
   Legend,
   Filler
 )
+
+// Configurare client Finnhub
+const finnhubClient = new finnhub.DefaultApi()
+finnhub.ApiClient.instance.authentications['api_key'].apiKey = import.meta.env.VITE_FINNHUB_API_KEY as string
 
 interface StockData {
   labels: string[]
@@ -43,8 +48,6 @@ interface PortfolioItem {
   dividendFrequency: string
   companyName: string
 }
-
-const FINNHUB_API_KEY = import.meta.env.VITE_FINNHUB_API_KEY as string
 
 function App() {
   const [symbol, setSymbol] = useState('')
@@ -83,26 +86,14 @@ function App() {
     setStockData(null)
     
     try {
-      if (!FINNHUB_API_KEY) {
-        throw new Error('Cheia API Finnhub nu este configurată')
-      }
-
       // Obținem datele companiei
-      const companyResponse = await fetch(
-        `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`,
-        {
-          headers: {
-            'X-Finnhub-Token': FINNHUB_API_KEY
-          }
-        }
-      )
-      
-      if (!companyResponse.ok) {
-        throw new Error(`Eroare la obținerea datelor companiei: ${companyResponse.statusText}`)
-      }
+      const companyData = await new Promise<CompanyProfile>((resolve, reject) => {
+        finnhubClient.companyProfile2({ symbol }, (error, data) => {
+          if (error) reject(error)
+          else resolve(data)
+        })
+      })
 
-      const companyData = await companyResponse.json()
-      
       if (!companyData || !companyData.name) {
         throw new Error('Simbol invalid sau companie negăsită')
       }
@@ -110,87 +101,32 @@ function App() {
       // Obținem istoricul prețurilor
       const today = Math.floor(Date.now() / 1000)
       const oneMonthAgo = today - 30 * 24 * 60 * 60
-      
-      console.log('Requesting candles data with params:', {
-        symbol,
-        from: new Date(oneMonthAgo * 1000).toISOString(),
-        to: new Date(today * 1000).toISOString(),
-        resolution: 'D'
+
+      const candlesData = await new Promise<StockCandles>((resolve, reject) => {
+        finnhubClient.stockCandles(symbol, 'D', oneMonthAgo, today, (error, data) => {
+          if (error) reject(error)
+          else resolve(data)
+        })
       })
 
-      const candlesResponse = await fetch(
-        `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${oneMonthAgo}&to=${today}&token=${FINNHUB_API_KEY}`,
-        {
-          headers: {
-            'X-Finnhub-Token': FINNHUB_API_KEY
-          }
-        }
-      )
-
-      console.log('Candles Response Status:', candlesResponse.status)
-      console.log('Candles Response Headers:', Object.fromEntries(candlesResponse.headers.entries()))
-
-      if (!candlesResponse.ok) {
-        const errorText = await candlesResponse.text()
-        console.error('Candles Error Response:', errorText)
-        
-        if (candlesResponse.status === 429) {
-          throw new Error('Limită de rate API depășită. Te rugăm să aștepți câteva secunde și să încerci din nou.')
-        } else if (candlesResponse.status === 403) {
-          throw new Error('Cheie API invalidă sau expirată.')
-        } else {
-          throw new Error(`Eroare la obținerea datelor despre prețuri: ${candlesResponse.status} - ${errorText || candlesResponse.statusText}`)
-        }
-      }
-
-      const candlesData = await candlesResponse.json()
-      console.log('Candles Data:', candlesData)
-
-      if (!candlesData || typeof candlesData !== 'object') {
-        throw new Error('Format invalid pentru datele despre prețuri')
-      }
-
-      if (candlesData.s === 'no_data') {
+      if (!candlesData || candlesData.s === 'no_data') {
         throw new Error('Nu există date disponibile pentru acest simbol')
       }
 
-      if (!candlesData.t || !Array.isArray(candlesData.t) || !candlesData.c || !Array.isArray(candlesData.c)) {
-        throw new Error('Date incomplete despre prețuri')
-      }
-
-      if (candlesData.t.length === 0 || candlesData.c.length === 0) {
-        throw new Error('Nu există suficiente date pentru a afișa graficul')
-      }
-
-      // Obținem datele despre dividende folosind formatul de dată YYYY-MM-DD
+      // Obținem datele despre dividende
       const fromDate = new Date(oneMonthAgo * 1000).toISOString().split('T')[0]
       const toDate = new Date((today + 365 * 24 * 60 * 60) * 1000).toISOString().split('T')[0]
-      
-      console.log('Requesting dividend data with params:', {
-        symbol,
-        from: fromDate,
-        to: toDate
+
+      const dividendsData = await new Promise<StockDividend[]>((resolve, reject) => {
+        finnhubClient.stockDividends(symbol, fromDate, toDate, (error, data) => {
+          if (error) reject(error)
+          else resolve(data)
+        })
       })
-
-      const dividendsResponse = await fetch(
-        `https://finnhub.io/api/v1/stock/dividend2?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${FINNHUB_API_KEY}`,
-        {
-          headers: {
-            'X-Finnhub-Token': FINNHUB_API_KEY
-          }
-        }
-      )
-
-      if (!dividendsResponse.ok) {
-        throw new Error(`Eroare la obținerea datelor despre dividende: ${dividendsResponse.statusText}`)
-      }
-
-      const dividendsData = await dividendsResponse.json()
-      console.log('Dividends Data:', dividendsData)
 
       // Verificăm dacă avem un array valid de dividende
       const sortedDividends = Array.isArray(dividendsData) && dividendsData.length > 0
-        ? dividendsData.sort((a: any, b: any) => b.date - a.date)
+        ? dividendsData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
         : []
       const nextDividend = sortedDividends[0]
       const dividendFrequency = Array.isArray(dividendsData) ? getDividendFrequency(dividendsData) : 'Unknown'
@@ -199,7 +135,7 @@ function App() {
         labels: candlesData.t.map(formatDate),
         prices: candlesData.c,
         dividendPerShare: nextDividend?.amount || 0,
-        nextDividendDate: nextDividend ? formatDate(nextDividend.date) : 'N/A',
+        nextDividendDate: nextDividend ? nextDividend.date : 'N/A',
         dividendFrequency: dividendFrequency,
         companyName: companyData.name
       }
