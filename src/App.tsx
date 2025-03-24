@@ -80,17 +80,21 @@ function App() {
     if (!symbol) return
     setError(null)
     setLoading(true)
-    setStockData(null) // Resetăm datele anterioare
+    setStockData(null)
     
     try {
-      // Verificăm dacă avem cheia API
       if (!FINNHUB_API_KEY) {
         throw new Error('Cheia API Finnhub nu este configurată')
       }
 
       // Obținem datele companiei
       const companyResponse = await fetch(
-        `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`
+        `https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`,
+        {
+          headers: {
+            'X-Finnhub-Token': FINNHUB_API_KEY
+          }
+        }
       )
       
       if (!companyResponse.ok) {
@@ -115,7 +119,12 @@ function App() {
       })
 
       const candlesResponse = await fetch(
-        `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${oneMonthAgo}&to=${today}&token=${FINNHUB_API_KEY}`
+        `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${oneMonthAgo}&to=${today}&token=${FINNHUB_API_KEY}`,
+        {
+          headers: {
+            'X-Finnhub-Token': FINNHUB_API_KEY
+          }
+        }
       )
 
       console.log('Candles Response Status:', candlesResponse.status)
@@ -153,9 +162,23 @@ function App() {
         throw new Error('Nu există suficiente date pentru a afișa graficul')
       }
 
-      // Obținem datele despre dividende
+      // Obținem datele despre dividende folosind formatul de dată YYYY-MM-DD
+      const fromDate = new Date(oneMonthAgo * 1000).toISOString().split('T')[0]
+      const toDate = new Date((today + 365 * 24 * 60 * 60) * 1000).toISOString().split('T')[0]
+      
+      console.log('Requesting dividend data with params:', {
+        symbol,
+        from: fromDate,
+        to: toDate
+      })
+
       const dividendsResponse = await fetch(
-        `https://finnhub.io/api/v1/stock/dividend2?symbol=${symbol}&from=${oneMonthAgo}&to=${today + 365 * 24 * 60 * 60}&token=${FINNHUB_API_KEY}`
+        `https://finnhub.io/api/v1/stock/dividend2?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${FINNHUB_API_KEY}`,
+        {
+          headers: {
+            'X-Finnhub-Token': FINNHUB_API_KEY
+          }
+        }
       )
 
       if (!dividendsResponse.ok) {
@@ -163,7 +186,7 @@ function App() {
       }
 
       const dividendsData = await dividendsResponse.json()
-      console.log('Dividends Data:', dividendsData) // Pentru debugging
+      console.log('Dividends Data:', dividendsData)
 
       // Verificăm dacă avem un array valid de dividende
       const sortedDividends = Array.isArray(dividendsData) && dividendsData.length > 0
