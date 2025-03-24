@@ -69,7 +69,7 @@ function App() {
     setStockData(null)
 
     const API_KEY = import.meta.env.VITE_MARKETSTACK_API_KEY
-    const BASE_URL = 'http://api.marketstack.com/v1'
+    const BASE_URL = 'https://api.marketstack.com/v1'
     
     try {
       console.log('Începem căutarea pentru simbolul:', symbol)
