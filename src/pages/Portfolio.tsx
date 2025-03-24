@@ -63,7 +63,7 @@ function Portfolio() {
               </h1>
             </div>
             <a
-              href="/"
+              href="https://hellix17.github.io/Cosmic-trader"
               className="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors text-white font-medium"
             >
               Înapoi la Căutare

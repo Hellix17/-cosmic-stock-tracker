@@ -7,7 +7,7 @@ import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <Router basename="/Cosmic-trader">
+    <Router>
       <Routes>
         <Route path="/" element={<App />} />
         <Route path="/portfolio" element={<Portfolio />} />
