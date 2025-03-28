@@ -3,9 +3,10 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/Cosmic-trader/',
+  base: '/-cosmic-stock-tracker/',
   build: {
     outDir: 'docs',
+    assetsDir: 'assets',
     emptyOutDir: true
   },
   server: {
