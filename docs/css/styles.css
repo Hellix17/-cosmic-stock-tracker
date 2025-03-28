@@ -1,0 +1,280 @@
+/* Variabile pentru culori și efecte */
+:root {
+  --cosmic-primary: #6b46c1;
+  --cosmic-secondary: #805ad5;
+  --cosmic-accent: #9f7aea;
+  --cosmic-background: #0a0b1e;
+  --cosmic-text: #e2e8f0;
+  --cosmic-gradient: linear-gradient(135deg, #6b46c1 0%, #805ad5 100%);
+  --cosmic-glow: 0 0 20px rgba(159, 122, 234, 0.5);
+}
+
+/* Stiluri generale */
+body {
+  background-color: var(--cosmic-background);
+  color: var(--cosmic-text);
+  font-family: 'Montserrat', sans-serif;
+  background-image: 
+    radial-gradient(2px 2px at 20px 30px, #eee, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 50px 160px, #ddd, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 90px 40px, #fff, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 130px 80px, #fff, rgba(0,0,0,0)),
+    radial-gradient(2px 2px at 160px 120px, #ddd, rgba(0,0,0,0)),
+    radial-gradient(circle at 10% 20%, rgba(107, 70, 193, 0.2) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(128, 90, 213, 0.2) 0%, transparent 40%),
+    linear-gradient(180deg, #0a0b1e 0%, #1a1b3d 100%);
+  background-repeat: repeat, repeat, repeat, repeat, repeat, repeat, no-repeat, no-repeat, no-repeat;
+  background-size: 200px 200px, 200px 200px, 200px 200px, 200px 200px, 200px 200px, 200px 200px, 100% 100%, 100% 100%, 100% 100%;
+  background-attachment: fixed;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Efecte de stele */
+#stars, #stars2, #stars3 {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.star {
+  position: absolute;
+  background: #ffffff;
+  border-radius: 50%;
+  animation: starTwinkle 2s infinite ease-in-out;
+}
+
+@keyframes starTwinkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.7);
+  }
+}
+
+#stars .star {
+  box-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+#stars2 .star {
+  box-shadow: 0 0 3px rgba(255, 255, 255, 0.6);
+}
+
+#stars3 .star {
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.7), 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+/* Aurora effect */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    radial-gradient(circle at 50% -100%, rgba(107, 70, 193, 0.2) 0%, transparent 60%),
+    radial-gradient(circle at -100% 50%, rgba(128, 90, 213, 0.2) 0%, transparent 60%),
+    radial-gradient(circle at 200% 50%, rgba(159, 122, 234, 0.2) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+  animation: aurora 20s linear infinite;
+}
+
+@keyframes aurora {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+/* Efecte de gradient pentru text */
+.gradient-text {
+  background: var(--cosmic-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: var(--cosmic-glow);
+}
+
+.title-gradient {
+  background: var(--cosmic-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: var(--cosmic-glow);
+}
+
+/* Stiluri pentru input */
+.cosmic-input {
+  background: rgba(26, 32, 44, 0.8);
+  border: 2px solid var(--cosmic-primary);
+  color: var(--cosmic-text);
+  transition: all 0.3s ease;
+  box-shadow: var(--cosmic-glow);
+}
+
+.cosmic-input:focus {
+  outline: none;
+  border-color: var(--cosmic-accent);
+  box-shadow: 0 0 15px rgba(159, 122, 234, 0.3);
+}
+
+/* Stiluri pentru butoane */
+.cosmic-button {
+  background: var(--cosmic-gradient);
+  color: white;
+  border: none;
+  transition: all 0.3s ease;
+  box-shadow: var(--cosmic-glow);
+  position: relative;
+  overflow: hidden;
+}
+
+.cosmic-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(159, 122, 234, 0.7);
+}
+
+.cosmic-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: 0.5s;
+}
+
+.cosmic-button:hover::before {
+  left: 100%;
+}
+
+/* Stiluri pentru carduri */
+.stock-card {
+  background: rgba(26, 32, 44, 0.8);
+  border: 1px solid var(--cosmic-primary);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  box-shadow: var(--cosmic-glow);
+}
+
+.stock-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 0 30px rgba(159, 122, 234, 0.4);
+}
+
+/* Stiluri pentru nav */
+.nav-container {
+  background: rgba(26, 32, 44, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--cosmic-primary);
+  box-shadow: 0 2px 15px rgba(107, 70, 193, 0.2);
+}
+
+/* Stiluri pentru chart */
+#chartContainer {
+  background: rgba(26, 32, 44, 0.8);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid var(--cosmic-primary);
+  box-shadow: var(--cosmic-glow);
+}
+
+/* Efecte de animație */
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+.floating {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Stiluri pentru scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--cosmic-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--cosmic-gradient);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--cosmic-accent);
+}
+
+/* Efecte de particule */
+.particle {
+  position: fixed;
+  width: 2px;
+  height: 2px;
+  background: #ffffff;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  animation: particleFloat 20s linear infinite;
+  box-shadow: 0 0 3px #ffffff;
+}
+
+.particle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+@keyframes particleFloat {
+  0% {
+    transform: translateY(100vh) scale(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: var(--particle-opacity, 0.6);
+  }
+  90% {
+    opacity: var(--particle-opacity, 0.6);
+  }
+  100% {
+    transform: translateY(-100vh) translateX(var(--particle-drift, 20px)) scale(1);
+    opacity: 0;
+  }
+} 

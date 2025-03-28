@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portofoliul Meu - Stock Tracker</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
+
+      :root {
+        --space-blue: #1a237e;
+        --night-sky: #121858;
+        --starlight: #ffffff;
+        --nebula-purple: #7c4dff;
+        --cosmic-dust: #b39ddb;
+        --meteor-orange: #ff6e40;
+      }
+
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: linear-gradient(
+          135deg,
+          var(--night-sky),
+          var(--space-blue)
+        );
+        color: var(--starlight);
+        min-height: 100vh;
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      /* Restul stilurilor rămân la fel */
+      // ... existing code ...
+    </style>
+  </head>
+  <body>
+    <nav class="nav-container">
+      <div class="max-w-7xl mx-auto px-4">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center space-x-2">
+            <a href="index.html" class="flex items-center space-x-2">
+              <i class="fas fa-moon text-purple-300 text-2xl"></i>
+              <span class="text-xl font-bold title-gradient"
+                >Stock Tracker</span
+              >
+            </a>
+          </div>
+          <div class="flex space-x-4">
+            <a
+              href="index.html"
+              class="cosmic-button px-4 py-2 rounded-lg text-white"
+            >
+              <i class="fas fa-search mr-2"></i>Căutare
+            </a>
+            <button
+              id="addStockBtn"
+              class="cosmic-button px-4 py-2 rounded-lg text-white"
+            >
+              <i class="fas fa-plus-circle mr-2"></i>Adaugă Acțiune
+            </button>
+            <button
+              id="exportBtn"
+              class="cosmic-button px-4 py-2 rounded-lg text-white"
+            >
+              <i class="fas fa-file-export mr-2"></i>Exportă
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+      <!-- Sumar Portofoliu -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="stock-card p-6 rounded-lg">
+          <h3 class="text-lg font-semibold text-purple-300">
+            <i class="fas fa-wallet mr-2"></i>Valoare Totală
+          </h3>
+          <p class="text-2xl font-bold mt-2" id="totalValue">$0.00</p>
+        </div>
+        <div class="stock-card p-6 rounded-lg">
+          <h3 class="text-lg font-semibold text-purple-300">
+            <i class="fas fa-chart-line mr-2"></i>Profit/Pierdere
+          </h3>
+          <p class="text-2xl font-bold mt-2" id="totalProfitLoss">$0.00</p>
+        </div>
+        <div class="stock-card p-6 rounded-lg">
+          <h3 class="text-lg font-semibold text-purple-300">
+            <i class="fas fa-coins mr-2"></i>Dividende Anuale
+          </h3>
+          <p class="text-2xl font-bold mt-2" id="totalDividends">$0.00</p>
+        </div>
+        <div class="stock-card p-6 rounded-lg">
+          <h3 class="text-lg font-semibold text-purple-300">
+            <i class="fas fa-percentage mr-2"></i>Randament Total
+          </h3>
+          <p class="text-2xl font-bold mt-2" id="totalYield">0.00%</p>
+        </div>
+      </div>
+
+      <!-- Grafice -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div class="chart-container p-6 rounded-lg">
+          <h2 class="text-xl font-bold text-purple-300 mb-4">
+            <i class="fas fa-chart-pie mr-2"></i>Distribuție Portofoliu
+          </h2>
+          <canvas id="portfolioDistribution" class="w-full h-64"></canvas>
+        </div>
+        <div class="chart-container p-6 rounded-lg">
+          <h2 class="text-xl font-bold text-purple-300 mb-4">
+            <i class="fas fa-chart-line mr-2"></i>Evoluție Portofoliu
+          </h2>
+          <canvas id="portfolioPerformance" class="w-full h-64"></canvas>
+        </div>
+      </div>
+
+      <!-- Filtre și Sortare -->
+      <div class="flex flex-wrap gap-4 mb-8">
+        <select id="sortBy" class="cosmic-input px-4 py-2 rounded-lg">
+          <option value="symbol">Simbol</option>
+          <option value="value">Valoare</option>
+          <option value="profit">Profit</option>
+          <option value="dividend">Dividend</option>
+        </select>
+        <select id="filterBy" class="cosmic-input px-4 py-2 rounded-lg">
+          <option value="all">Toate</option>
+          <option value="profit">Cu Profit</option>
+          <option value="loss">Cu Pierdere</option>
+          <option value="dividend">Cu Dividende</option>
+        </select>
+        <button id="refreshBtn" class="cosmic-button px-4 py-2 rounded-lg">
+          <i class="fas fa-sync-alt mr-2"></i>Actualizează
+        </button>
+      </div>
+
+      <!-- Lista Acțiuni -->
+      <div
+        id="portfolioGrid"
+        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+      ></div>
+    </main>
+
+    <!-- Modal pentru Adăugare Acțiune -->
+    <div
+      id="addStockModal"
+      class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+    >
+      <div class="modal-cosmic p-6 rounded-lg w-full max-w-md">
+        <h2 class="text-xl font-bold mb-4 text-purple-300">
+          <i class="fas fa-plus-circle mr-2"></i>Adaugă o Nouă Acțiune
+        </h2>
+        <form id="addStockForm">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-purple-300">
+                <i class="fas fa-tag mr-2"></i>Simbol
+              </label>
+              <input
+                type="text"
+                required
+                class="cosmic-input mt-1 w-full p-2 rounded-lg"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-purple-300">
+                <i class="fas fa-hashtag mr-2"></i>Număr Acțiuni
+              </label>
+              <input
+                type="number"
+                required
+                class="cosmic-input mt-1 w-full p-2 rounded-lg"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-purple-300">
+                <i class="fas fa-dollar-sign mr-2"></i>Preț de Achiziție
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                class="cosmic-input mt-1 w-full p-2 rounded-lg"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-purple-300">
+                <i class="fas fa-calendar-alt mr-2"></i>Data Achiziției
+              </label>
+              <input
+                type="date"
+                required
+                class="cosmic-input mt-1 w-full p-2 rounded-lg"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-purple-300">
+                <i class="fas fa-sticky-note mr-2"></i>Note
+              </label>
+              <textarea
+                class="cosmic-input mt-1 w-full p-2 rounded-lg"
+                rows="3"
+              ></textarea>
+            </div>
+          </div>
+          <div class="mt-6 flex justify-end space-x-3">
+            <button type="button" class="cosmic-button" onclick="closeModal()">
+              <i class="fas fa-times mr-2"></i>Anulează
+            </button>
+            <button type="submit" class="cosmic-button">
+              <i class="fas fa-check mr-2"></i>Adaugă
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/portfolio.js"></script>
+  </body>
+</html>

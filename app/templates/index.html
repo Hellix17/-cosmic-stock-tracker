@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ro">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cosmic Stock Tracker</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link
+      href="{{ url_for('static', filename='css/styles.css') }}"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="min-h-screen p-8">
+    <!-- Container pentru particule -->
+    <div id="particles"></div>
+
+    <!-- Container pentru stele -->
+    <div id="stars"></div>
+    <div id="stars2"></div>
+    <div id="stars3"></div>
+
+    <nav class="nav-container">
+      <div class="max-w-7xl mx-auto px-4">
+        <div class="flex justify-between items-center py-4">
+          <div class="flex items-center space-x-2">
+            <i class="fas fa-rocket text-purple-300 text-2xl floating"></i>
+            <span class="text-xl font-bold title-gradient"
+              >Cosmic Stock Tracker</span
+            >
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+      <!-- Header -->
+      <header class="text-center mb-12">
+        <h1 class="text-4xl font-bold mb-4 gradient-text">
+          Explorează Universul Investițiilor!
+        </h1>
+        <p class="text-lg text-gray-300">
+          Navighează prin constelațiile acțiunilor într-o experiență cosmică
+          unică.
+        </p>
+      </header>
+
+      <!-- Bara de căutare -->
+      <div class="max-w-4xl mx-auto mb-8">
+        <div class="flex gap-4">
+          <div class="flex-1 relative">
+            <input
+              type="text"
+              id="stockSearch"
+              name="stockSearch"
+              placeholder="Caută simbol acțiune (ex: AAPL, MSFT, GOOGL)"
+              class="cosmic-input w-full px-4 py-2 rounded-lg"
+            />
+            <div
+              class="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400"
+            >
+              <i class="fas fa-search"></i>
+            </div>
+          </div>
+          <button id="searchBtn" class="cosmic-button px-6 py-2 rounded-lg">
+            <i class="fas fa-rocket mr-2"></i>Explorează
+          </button>
+        </div>
+      </div>
+
+      <!-- Container pentru Evoluția Prețului -->
+      <div id="chartContainer" class="mb-8 hidden"></div>
+
+      <!-- Grid pentru rezultate căutare -->
+      <div id="stockGrid" class="space-y-6"></div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+      // Funcție pentru a genera un număr aleatoriu într-un interval
+      function random(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      // Adaugă particule
+      function createParticle() {
+        const particles = document.getElementById("particles");
+        const particle = document.createElement("div");
+        particle.className = "particle";
+
+        // Poziție aleatorie pe axa X
+        particle.style.left = Math.random() * 100 + "vw";
+
+        // Proprietăți CSS personalizate pentru animație
+        particle.style.setProperty("--particle-drift", random(-50, 50) + "px");
+        particle.style.setProperty("--particle-opacity", random(0.3, 0.8));
+
+        // Dimensiune aleatorie
+        const size = random(1, 3);
+        particle.style.width = size + "px";
+        particle.style.height = size + "px";
+
+        particles.appendChild(particle);
+
+        // Elimină particula după ce animația s-a terminat
+        setTimeout(() => {
+          particle.remove();
+        }, 20000);
+      }
+
+      // Creează particule la intervale regulate
+      setInterval(createParticle, 300);
+
+      // Creează particule inițiale
+      for (let i = 0; i < 50; i++) {
+        setTimeout(createParticle, i * 100);
+      }
+
+      // Adaugă stele statice
+      function createStars(container, count, size) {
+        const stars = document.getElementById(container);
+        for (let i = 0; i < count; i++) {
+          const star = document.createElement("div");
+          star.className = "star";
+          star.style.width = size + "px";
+          star.style.height = size + "px";
+          star.style.left = random(0, 100) + "vw";
+          star.style.top = random(0, 100) + "vh";
+          star.style.animationDelay = random(0, 2) + "s";
+          stars.appendChild(star);
+        }
+      }
+
+      // Creează diferite straturi de stele
+      createStars("stars", 100, 1); // Stele mici
+      createStars("stars2", 50, 2); // Stele medii
+      createStars("stars3", 25, 3); // Stele mari
+    </script>
+  </body>
+</html>
