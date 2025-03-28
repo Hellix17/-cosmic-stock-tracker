@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Line } from 'react-chartjs-2'
+import { useState } from 'react';
+import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -9,8 +9,9 @@ import {
   Title,
   Tooltip,
   Legend,
-  ChartData
-} from 'chart.js'
+} from 'chart.js';
+import { Portfolio } from './components/Portfolio';
+import { AddToPortfolio } from './components/AddToPortfolio';
 
 ChartJS.register(
   CategoryScale,
@@ -20,462 +21,144 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend
-)
+);
 
-interface StockData {
-  labels: string[]
-  prices: number[]
-  companyName: string
-  dividendPerShare: number
-  nextDividendDate: string
-  dividendFrequency: string
-}
-
-interface PortfolioItem {
-  symbol: string
-  shares: number
-  price: number
-  dividendPerShare: number
-  nextDividendDate: string
-  dividendFrequency: string
-}
-
-interface MarketStackEOD {
-  close: number
-  date: string
-}
-
-interface MarketStackCompany {
-  name: string
-}
-
-type TimePeriod = '1M' | '3M' | '6M' | 'YTD' | '1Y'
-
-const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short' })
-}
+type TimePeriod = '1M' | '3M' | '6M' | 'YTD' | '1Y';
 
 function App() {
-  const [symbol, setSymbol] = useState(() => localStorage.getItem('lastSymbol') || '')
-  const [stockData, setStockData] = useState<StockData | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [portfolio, setPortfolio] = useState<PortfolioItem[]>(() => {
-    const savedPortfolio = localStorage.getItem('portfolio')
-    return savedPortfolio ? JSON.parse(savedPortfolio) : []
-  })
-  const [shares, setShares] = useState<number>(1)
-  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>(() => 
-    (localStorage.getItem('selectedPeriod') as TimePeriod) || '1M'
-  )
+  const [symbol, setSymbol] = useState('');
+  const [stockData, setStockData] = useState<any>(null);
+  const [error, setError] = useState('');
+  const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1M');
+  const [showPortfolio, setShowPortfolio] = useState(false);
 
-  // Salvăm portofoliul în localStorage când se modifică
-  const updatePortfolio = (newPortfolio: PortfolioItem[]) => {
-    setPortfolio(newPortfolio)
-    localStorage.setItem('portfolio', JSON.stringify(newPortfolio))
-  }
-
-  // Salvăm simbolul în localStorage când se modifică
-  const updateSymbol = (newSymbol: string) => {
-    setSymbol(newSymbol)
-    localStorage.setItem('lastSymbol', newSymbol)
-  }
-
-  // Salvăm perioada selectată în localStorage când se modifică
-  const updatePeriod = (period: TimePeriod) => {
-    setSelectedPeriod(period)
-    localStorage.setItem('selectedPeriod', period)
-  }
-
-  // Efectuăm căutarea inițială la încărcarea paginii dacă avem un simbol salvat
-  useEffect(() => {
-    if (symbol) {
-      void searchStock(selectedPeriod)
-    }
-  }, []) // Rulăm doar la montarea componentei
-
-  const getStartDate = (period: TimePeriod): string => {
-    const now = new Date()
+  const getStartDate = (period: TimePeriod) => {
+    const now = new Date();
     switch (period) {
       case '1M':
-        return new Date(now.setMonth(now.getMonth() - 1)).toISOString().split('T')[0]
+        return new Date(now.setMonth(now.getMonth() - 1));
       case '3M':
-        return new Date(now.setMonth(now.getMonth() - 3)).toISOString().split('T')[0]
+        return new Date(now.setMonth(now.getMonth() - 3));
       case '6M':
-        return new Date(now.setMonth(now.getMonth() - 6)).toISOString().split('T')[0]
+        return new Date(now.setMonth(now.getMonth() - 6));
       case 'YTD':
-        return new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
+        return new Date(now.getFullYear(), 0, 1);
       case '1Y':
-        return new Date(now.setFullYear(now.getFullYear() - 1)).toISOString().split('T')[0]
+        return new Date(now.setFullYear(now.getFullYear() - 1));
       default:
-        return new Date(now.setMonth(now.getMonth() - 1)).toISOString().split('T')[0]
+        return new Date(now.setMonth(now.getMonth() - 1));
     }
-  }
+  };
 
   const searchStock = async (period: TimePeriod = selectedPeriod) => {
-    if (!symbol) return
-    setError(null)
-    setLoading(true)
-    setStockData(null)
+    if (!symbol) return;
 
-    const API_KEY = import.meta.env.VITE_MARKETSTACK_API_KEY
-    const BASE_URL = 'https://api.marketstack.com/v1'
-    
     try {
-      console.log('Începem căutarea pentru simbolul:', symbol)
-      console.log('Folosim cheia API:', API_KEY ? 'DA' : 'NU')
+      const startDate = getStartDate(period);
+      const response = await fetch(
+        `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/day/${startDate.toISOString().split('T')[0]}/${new Date().toISOString().split('T')[0]}?apiKey=POLYGON_API_KEY&limit=500`
+      );
+      const data = await response.json();
 
-      if (!API_KEY) {
-        throw new Error('Cheia API MarketStack nu este configurată corect')
+      if (data.resultsCount === 0) {
+        setError('Nu s-au găsit date pentru acest simbol.');
+        setStockData(null);
+        return;
       }
 
-      // Obținem datele companiei
-      console.log('Încercăm să obținem datele companiei...')
-      const companyResponse = await fetch(`${BASE_URL}/tickers/${symbol}?access_key=${API_KEY}`)
-      if (!companyResponse.ok) {
-        throw new Error(`Eroare la obținerea datelor companiei: ${companyResponse.statusText}`)
-      }
-      const companyData: MarketStackCompany = await companyResponse.json()
-
-      // Obținem istoricul prețurilor
-      const endDate = new Date().toISOString().split('T')[0]
-      const startDate = getStartDate(period)
-      
-      console.log('Încercăm să obținem datele despre prețuri...')
-      const eodResponse = await fetch(
-        `${BASE_URL}/eod?access_key=${API_KEY}&symbols=${symbol}&date_from=${startDate}&date_to=${endDate}&limit=500`
-      )
-      if (!eodResponse.ok) {
-        throw new Error(`Eroare la obținerea datelor EOD: ${eodResponse.statusText}`)
-      }
-      const eodData = await eodResponse.json()
-      const stockPrices: MarketStackEOD[] = eodData.data || []
-
-      if (!stockPrices.length) {
-        throw new Error('Nu există date disponibile pentru acest simbol')
-      }
-
-      // Simulăm date despre dividende
-      const mockDividend = {
-        amount: (stockPrices[0]?.close || 0) * 0.02,
-        nextDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        frequency: 'Trimestrial'
-      }
-
-      console.log('Construim obiectul stockData...')
-      const stockData: StockData = {
-        labels: stockPrices.map(day => formatDate(day.date)).reverse(),
-        prices: stockPrices.map(day => day.close).reverse(),
-        companyName: companyData.name,
-        dividendPerShare: mockDividend.amount,
-        nextDividendDate: mockDividend.nextDate,
-        dividendFrequency: mockDividend.frequency
-      }
-
-      console.log('StockData final:', stockData)
-      setStockData(stockData)
-      updatePeriod(period)
-    } catch (error) {
-      console.error('Eroare completă:', error)
-      let errorMessage = 'A apărut o eroare la încărcarea datelor'
-      
-      if (error instanceof Error) {
-        if (error.message.includes('Failed to fetch')) {
-          errorMessage = 'Eroare de conexiune. Verificați conexiunea la internet și încercați din nou.'
-        } else if (error.message.includes('NetworkError')) {
-          errorMessage = 'Eroare de rețea. Verificați dacă aveți acces la internet.'
-        } else if (error.message.includes('402')) {
-          errorMessage = 'Limită API depășită. Încercați mai târziu.'
-        } else {
-          errorMessage = error.message
-        }
-      }
-      
-      setError(errorMessage)
-      setStockData(null)
-    } finally {
-      setLoading(false)
+      setStockData(data);
+      setError('');
+      setSelectedPeriod(period);
+    } catch (err) {
+      setError('A apărut o eroare la căutarea datelor.');
+      setStockData(null);
     }
-  }
+  };
 
-  const addToPortfolio = () => {
-    if (!stockData) {
-      setError('Nu există date despre acțiuni pentru a adăuga la portofoliu')
-      return
-    }
-
-    // Verificăm dacă acțiunea există deja în portofoliu
-    const existingStock = portfolio.find(item => item.symbol === symbol.toUpperCase())
-    if (existingStock) {
-      // Actualizăm numărul de acțiuni dacă simbolul există deja
-      updatePortfolio(
-        portfolio.map(item =>
-          item.symbol === symbol.toUpperCase()
-            ? { ...item, shares: item.shares + shares }
-            : item
-        )
-      )
-    } else {
-      // Adăugăm o nouă intrare în portofoliu
-      const newItem: PortfolioItem = {
-        symbol: symbol.toUpperCase(),
-        shares: shares,
-        price: stockData.prices[stockData.prices.length - 1],
-        dividendPerShare: stockData.dividendPerShare,
-        nextDividendDate: stockData.nextDividendDate,
-        dividendFrequency: stockData.dividendFrequency
-      }
-      updatePortfolio([...portfolio, newItem])
-    }
-
-    // Resetăm numărul de acțiuni și afișăm un mesaj de succes
-    setShares(1)
-    setError(null)
-    // Afișăm un mesaj de confirmare temporar
-    const successMessage = existingStock 
-      ? `Am actualizat ${shares} acțiuni pentru ${symbol.toUpperCase()}`
-      : `Am adăugat ${shares} acțiuni noi pentru ${symbol.toUpperCase()}`
-    
-    const tempDiv = document.createElement('div')
-    tempDiv.className = 'fixed bottom-4 right-4 bg-green-500/90 text-white px-6 py-3 rounded-lg shadow-lg'
-    tempDiv.textContent = successMessage
-    document.body.appendChild(tempDiv)
-    
-    setTimeout(() => {
-      document.body.removeChild(tempDiv)
-    }, 3000)
-  }
-
-  const updateShares = (symbol: string, newShares: number) => {
-    if (newShares <= 0) {
-      // Dacă numărul de acțiuni este 0 sau negativ, eliminăm acțiunea din portofoliu
-      updatePortfolio(portfolio.filter(item => item.symbol !== symbol))
-    } else {
-      // Altfel, actualizăm numărul de acțiuni
-      updatePortfolio(
-        portfolio.map(item =>
-          item.symbol === symbol
-            ? { ...item, shares: newShares }
-            : item
-        )
-      )
-    }
-  }
-
-  const chartData: ChartData<'line'> | null = stockData ? {
-    labels: stockData.labels,
+  const chartData = stockData?.results ? {
+    labels: stockData.results.map((item: any) =>
+      new Date(item.t).toLocaleDateString('ro-RO')
+    ),
     datasets: [
       {
-        label: 'Preț acțiune',
-        data: stockData.prices,
-        borderColor: 'rgb(139, 92, 246)',
-        backgroundColor: 'rgba(139, 92, 246, 0.5)',
+        label: symbol,
+        data: stockData.results.map((item: any) => item.c),
+        borderColor: 'rgb(75, 192, 192)',
         tension: 0.1
       }
     ]
-  } : null
+  } : null;
 
   return (
-    <div className="min-h-screen bg-[#0A0B1E] bg-[url('/stars.png')] text-white">
-      <div className="max-w-7xl mx-auto px-4">
-        {/* Header */}
-        <header className="py-6 border-b border-violet-800/30">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">🌙</span>
-              <h1 className="text-2xl font-medium bg-gradient-to-r from-violet-400 to-purple-600 bg-clip-text text-transparent">
-                Stock Tracker
-              </h1>
-            </div>
-            <a
-              href="https://hellix17.github.io/portfolio"
-              className="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors text-white font-medium"
-            >
-              Vezi Portofoliul
-            </a>
-          </div>
-        </header>
+    <div className="min-h-screen bg-gray-900 text-white py-8 px-4 sm:px-6 lg:px-8">
+      <nav className="mb-8 flex justify-between items-center">
+        <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">
+          Cosmic Trade
+        </h1>
+        <button
+          onClick={() => setShowPortfolio(!showPortfolio)}
+          className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
+        >
+          {showPortfolio ? 'Vezi Grafic' : 'Vezi Portofoliu'}
+        </button>
+      </nav>
 
-        {/* Hero Section */}
-        <div className="py-20 text-center space-y-6">
-          <h2 className="text-5xl font-bold bg-gradient-to-r from-violet-400 to-purple-600 bg-clip-text text-transparent">
-            Bun venit în Spațiul Investițiilor!
-          </h2>
-          <p className="text-violet-300 text-lg">
-            Urmărește evoluția acțiunilor într-un mod interactiv și elegant.
-          </p>
-
-          {/* Search Bar */}
-          <div className="max-w-2xl mx-auto mt-12">
-            <div className="relative flex items-center">
+      {!showPortfolio ? (
+        <>
+          <div className="max-w-3xl mx-auto">
+            <div className="flex gap-4 mb-6">
               <input
                 type="text"
                 value={symbol}
-                onChange={(e) => updateSymbol(e.target.value.toUpperCase())}
-                placeholder="Introduceți simbolul (ex: AAPL)"
-                className="w-full px-6 py-4 bg-white/5 border border-violet-500/30 rounded-lg focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 text-lg"
-                onKeyDown={(e) => e.key === 'Enter' && searchStock()}
+                onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                placeholder="Introdu simbolul (ex: AAPL)"
+                className="flex-1 p-2 rounded bg-gray-800 border border-gray-700"
               />
               <button
                 onClick={() => searchStock()}
-                disabled={loading}
-                className="absolute right-2 px-6 py-2 bg-violet-600 hover:bg-violet-500 rounded-md transition-colors disabled:opacity-50 text-white font-medium"
+                className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700"
               >
-                {loading ? 'Se încarcă...' : 'Caută'}
+                Caută
               </button>
             </div>
-          </div>
-        </div>
 
-        {error && (
-          <div className="max-w-2xl mx-auto mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-200">
-            {error}
-          </div>
-        )}
+            {error && <p className="text-red-500 mb-4">{error}</p>}
 
-        {stockData && (
-          <div className="space-y-8 mb-20">
-            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-violet-500/30">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-semibold flex items-center gap-2">
-                  <span className="text-violet-400">{symbol.toUpperCase()}</span>
-                  <span className="text-gray-400">•</span>
-                  <span>{stockData.companyName}</span>
-                </h2>
-                <div className="flex gap-2">
+            {stockData && (
+              <div className="space-y-6">
+                <div className="flex justify-center gap-2 mb-4">
                   {(['1M', '3M', '6M', 'YTD', '1Y'] as TimePeriod[]).map((period) => (
                     <button
                       key={period}
-                      onClick={() => {
-                        void searchStock(period)
-                      }}
-                      className={`px-3 py-1 rounded-md transition-colors ${
+                      onClick={() => searchStock(period)}
+                      className={`px-3 py-1 rounded ${
                         selectedPeriod === period
-                          ? 'bg-violet-600 text-white'
-                          : 'bg-white/5 hover:bg-white/10 text-violet-300'
+                          ? 'bg-blue-600'
+                          : 'bg-gray-700 hover:bg-gray-600'
                       }`}
                     >
                       {period}
                     </button>
                   ))}
                 </div>
-              </div>
-              <div className="h-[400px]">
-                {chartData && <Line data={chartData} options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  scales: {
-                    y: {
-                      ticks: { 
-                        color: 'rgba(255, 255, 255, 0.7)',
-                        callback: (value) => `$${value}`
-                      },
-                      grid: { color: 'rgba(139, 92, 246, 0.1)' }
-                    },
-                    x: {
-                      ticks: { color: 'rgba(255, 255, 255, 0.7)' },
-                      grid: { color: 'rgba(139, 92, 246, 0.1)' }
-                    }
-                  },
-                  plugins: {
-                    legend: { 
-                      labels: { color: 'rgba(255, 255, 255, 0.9)' },
-                      display: false
-                    },
-                    tooltip: {
-                      callbacks: {
-                        label: (context) => `$${context.parsed.y.toFixed(2)}`
-                      }
-                    }
-                  }
-                }} />}
-              </div>
-            </div>
 
-            <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-violet-500/30">
-              <h3 className="text-xl font-semibold mb-6 text-violet-400">Adaugă la portofoliu</h3>
-              <div className="flex gap-4 items-center">
-                <input
-                  type="number"
-                  value={shares}
-                  onChange={(e) => setShares(Math.max(0.01, Number(e.target.value)))}
-                  step="0.01"
-                  min="0.01"
-                  className="w-32 px-4 py-2 bg-white/5 border border-violet-500/30 rounded-lg focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-                />
-                <button
-                  onClick={addToPortfolio}
-                  className="px-6 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg transition-colors text-white font-medium"
-                >
-                  Adaugă la portofoliu
-                </button>
-              </div>
-            </div>
-
-            {portfolio.length > 0 && (
-              <div className="bg-white/5 backdrop-blur-sm p-8 rounded-2xl border border-violet-500/30">
-                <h3 className="text-xl font-semibold mb-6 text-violet-400">Portofoliul meu</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="text-violet-300 border-b border-violet-500/30">
-                        <th className="text-left p-3">Simbol</th>
-                        <th className="text-left p-3">Acțiuni</th>
-                        <th className="text-right p-3">Preț/acțiune</th>
-                        <th className="text-right p-3">Valoare totală</th>
-                        <th className="text-right p-3">Dividend/acțiune</th>
-                        <th className="text-right p-3">Dividend estimat</th>
-                        <th className="text-left p-3">Următorul dividend</th>
-                        <th className="text-left p-3">Frecvență</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {portfolio.map((item) => (
-                        <tr key={item.symbol} className="border-b border-violet-500/10 hover:bg-white/5">
-                          <td className="p-3 font-medium text-violet-400">{item.symbol}</td>
-                          <td className="p-3">
-                            <input
-                              type="number"
-                              value={item.shares}
-                              onChange={(e) => updateShares(item.symbol, Math.max(0.01, Number(e.target.value)))}
-                              step="0.01"
-                              min="0.01"
-                              className="w-24 px-2 py-1 bg-white/5 border border-violet-500/30 rounded-md focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-                            />
-                          </td>
-                          <td className="text-right p-3">${item.price.toFixed(2)}</td>
-                          <td className="text-right p-3 font-medium">${(item.price * item.shares).toFixed(2)}</td>
-                          <td className="text-right p-3">${item.dividendPerShare.toFixed(3)}</td>
-                          <td className="text-right p-3">${(item.dividendPerShare * item.shares).toFixed(2)}</td>
-                          <td className="p-3">{item.nextDividendDate}</td>
-                          <td className="p-3">{item.dividendFrequency}</td>
-                        </tr>
-                      ))}
-                      <tr className="border-t border-violet-500/30 font-semibold bg-white/5">
-                        <td className="p-3">Total</td>
-                        <td className="p-3"></td>
-                        <td className="p-3"></td>
-                        <td className="text-right p-3 text-violet-400">
-                          ${portfolio.reduce((sum, item) => sum + item.price * item.shares, 0).toFixed(2)}
-                        </td>
-                        <td className="p-3"></td>
-                        <td className="text-right p-3 text-violet-400">
-                          ${portfolio.reduce((sum, item) => sum + item.dividendPerShare * item.shares, 0).toFixed(2)}
-                        </td>
-                        <td className="p-3"></td>
-                        <td className="p-3"></td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div className="bg-gray-800 p-6 rounded-lg backdrop-blur-md bg-opacity-50">
+                  {chartData && <Line data={chartData} />}
                 </div>
+
+                <AddToPortfolio
+                  symbol={symbol}
+                  currentPrice={stockData.results[stockData.results.length - 1].c}
+                />
               </div>
             )}
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <Portfolio />
+      )}
     </div>
-  )
+  );
 }
 
-export default App 
+export default App; 
