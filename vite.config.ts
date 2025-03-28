@@ -8,7 +8,12 @@ export default defineConfig({
   build: {
     outDir: 'docs',
     assetsDir: 'assets',
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: undefined
+      }
+    }
   },
   server: {
     port: 3000,
