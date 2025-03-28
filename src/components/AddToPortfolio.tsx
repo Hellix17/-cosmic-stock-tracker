@@ -1,54 +1,46 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 interface AddToPortfolioProps {
   symbol: string;
   currentPrice: number;
 }
 
-export const AddToPortfolio: React.FC<AddToPortfolioProps> = ({ symbol, currentPrice }) => {
-  const [shares, setShares] = useState('');
+export function AddToPortfolio({ symbol, currentPrice }: AddToPortfolioProps) {
+  const [shares, setShares] = useState<number>(0);
   const [showForm, setShowForm] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const portfolio = JSON.parse(localStorage.getItem('portfolio') || '[]');
+    const savedPortfolio = localStorage.getItem('portfolio');
+    const portfolio = savedPortfolio ? JSON.parse(savedPortfolio) : [];
     
-    // Verifică dacă acțiunea există deja în portofoliu
-    const existingStockIndex = portfolio.findIndex((stock: any) => stock.symbol === symbol);
+    const existingStock = portfolio.find((stock: any) => stock.symbol === symbol);
     
-    const newStock = {
-      symbol,
-      shares: Number(shares),
-      averagePrice: currentPrice,
-      dividendYield: 0, // Vom actualiza aceste valori când vom avea datele
-      nextDividendDate: '', // Vom actualiza aceste valori când vom avea datele
-      dividendAmount: 0 // Vom actualiza aceste valori când vom avea datele
-    };
-
-    if (existingStockIndex >= 0) {
-      // Actualizează numărul de acțiuni și prețul mediu
-      const existingStock = portfolio[existingStockIndex];
-      const totalShares = existingStock.shares + Number(shares);
-      const totalCost = (existingStock.shares * existingStock.averagePrice) + (Number(shares) * currentPrice);
-      const newAveragePrice = totalCost / totalShares;
+    if (existingStock) {
+      // Actualizează acțiunile existente
+      const totalShares = existingStock.shares + shares;
+      const newAveragePrice = ((existingStock.shares * existingStock.averagePrice) + (shares * currentPrice)) / totalShares;
       
-      portfolio[existingStockIndex] = {
-        ...existingStock,
-        shares: totalShares,
-        averagePrice: newAveragePrice
-      };
+      existingStock.shares = totalShares;
+      existingStock.averagePrice = newAveragePrice;
     } else {
-      portfolio.push(newStock);
+      // Adaugă acțiuni noi
+      portfolio.push({
+        symbol,
+        shares,
+        averagePrice: currentPrice,
+        dividends: [] // Vom adăuga dividendele mai târziu
+      });
     }
-
+    
     localStorage.setItem('portfolio', JSON.stringify(portfolio));
-    setShares('');
+    setShares(0);
     setShowForm(false);
   };
 
   return (
-    <div className="mt-4">
+    <div className="mt-6">
       <button
         onClick={() => setShowForm(!showForm)}
         className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
@@ -57,32 +49,52 @@ export const AddToPortfolio: React.FC<AddToPortfolioProps> = ({ symbol, currentP
       </button>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-300">
-              Număr de Acțiuni
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={shares}
-              onChange={(e) => setShares(e.target.value)}
-              className="mt-1 block w-full rounded-md bg-gray-700 border-gray-600 text-white"
-              required
-            />
-          </div>
-          <div className="text-gray-300">
-            <p>Preț per acțiune: ${currentPrice}</p>
-            <p>Cost total: ${(Number(shares) * currentPrice).toFixed(2)}</p>
+        <form onSubmit={handleSubmit} className="mt-4 bg-gray-800 p-4 rounded-lg">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Număr de Acțiuni
+              </label>
+              <input
+                type="number"
+                value={shares}
+                onChange={(e) => setShares(Number(e.target.value))}
+                min="1"
+                className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Preț Curent
+              </label>
+              <input
+                type="text"
+                value={`$${currentPrice.toFixed(2)}`}
+                disabled
+                className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Cost Total
+              </label>
+              <input
+                type="text"
+                value={`$${(shares * currentPrice).toFixed(2)}`}
+                disabled
+                className="w-full p-2 rounded bg-gray-700 border border-gray-600 text-white"
+              />
+            </div>
           </div>
           <button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+            className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
           >
-            Confirmă Adăugarea
+            Adaugă în Portofoliu
           </button>
         </form>
       )}
     </div>
   );
-}; 
+} 
