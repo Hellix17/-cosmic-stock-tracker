@@ -25,6 +25,8 @@ ChartJS.register(
 
 type TimePeriod = '1M' | '3M' | '6M' | 'YTD' | '1Y';
 
+const POLYGON_API_KEY = 'EF4_nNyJgvXfgXUpKgUJm_mQwR7ZHJdJ'; // API key-ul tău
+
 function App() {
   const [symbol, setSymbol] = useState('');
   const [stockData, setStockData] = useState<any>(null);
@@ -56,7 +58,7 @@ function App() {
     try {
       const startDate = getStartDate(period);
       const response = await fetch(
-        `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/day/${startDate.toISOString().split('T')[0]}/${new Date().toISOString().split('T')[0]}?apiKey=POLYGON_API_KEY&limit=500`
+        `https://api.polygon.io/v2/aggs/ticker/${symbol}/range/1/day/${startDate.toISOString().split('T')[0]}/${new Date().toISOString().split('T')[0]}?apiKey=${POLYGON_API_KEY}&limit=500`
       );
       const data = await response.json();
 
